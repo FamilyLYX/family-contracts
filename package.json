@@ -1,7 +1,17 @@
 {
   "name": "hardhat-project",
   "devDependencies": {
+    "@ethersproject/bytes": "^5.7.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.4",
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
     "hardhat": "^2.17.3"
+  },
+  "dependencies": {
+    "@erc725/erc725.js": "^0.18.0",
+    "@erc725/smart-contracts": "^5.2.0",
+    "@lukso/lsp-smart-contracts": "^0.11.1",
+    "@openzeppelin/contracts": "^4.9.3",
+    "solidity-bytes-utils": "^0.8.0",
+    "solidity-docgen": "^0.6.0-beta.36"
   }
 }
