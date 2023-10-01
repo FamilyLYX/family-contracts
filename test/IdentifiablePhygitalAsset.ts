@@ -12,12 +12,23 @@ const _LSP4_TOKEN_NAME_KEY = '0xdeba1e292f8ba88238e10ab3c7f88bd4be4fac56cad5194b
 const _LSP4_TOKEN_SYMBOL_KEY = '0x2f0a68ab07768e01943a599e73362a0e17a63a72e94dd2e384d2c1d4db932756';
 
 describe("IdentifiablePhysicalAsset", function () {
+  const options = {
+    libraries: {}
+  };
+
+  beforeEach(async () => {
+    const TokenUtils = await ethers.getContractFactory("TokenUtils");
+    const tokenUtils = await TokenUtils.deploy();
+
+    (options.libraries as any).TokenUtils = await tokenUtils.getAddress();
+  });
+
   describe("Deployment", function () {
     it("Should set the right properties", async function () {
       // Contracts are deployed using the first signer/account by default
       const [owner, placeholder, userAccount] = await ethers.getSigners();
 
-      const IdentifiablePhygitalAsset = await ethers.getContractFactory("IdentifiablePhygitalAsset");
+      const IdentifiablePhygitalAsset = await ethers.getContractFactory("IdentifiablePhygitalAsset", options);
       const assetContract = await IdentifiablePhygitalAsset.deploy('IdentifiablePhygitalAsset', 'IPA', owner, 1, placeholder.address);
       
       const variantId = hexZeroPad(hexValue(29), 12),
@@ -44,7 +55,7 @@ describe("IdentifiablePhysicalAsset", function () {
       // Contracts are deployed using the first signer/account by default
       const [owner, placeholder, userAccount] = await ethers.getSigners();
 
-      const IdentifiablePhysicalAsset = await ethers.getContractFactory("IdentifiablePhygitalAsset");
+      const IdentifiablePhysicalAsset = await ethers.getContractFactory("IdentifiablePhygitalAsset", options);
       const assetContract = await IdentifiablePhysicalAsset.deploy('IdentifiablePhygitalAsset', 'IPA', owner, 1, placeholder.address);
       
       const variantId = hexZeroPad(hexValue(29), 12),

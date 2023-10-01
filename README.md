@@ -11,3 +11,5 @@ REPORT_GAS=true npx hardhat test
 npx hardhat node
 npx hardhat run scripts/deploy.ts
 ```
+
+Asset Registry: 0x4e8b1A7df48a1c78744361154908422a996EfAD2
