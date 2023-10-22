@@ -14,7 +14,7 @@ library TokenUtils {
     return bytes6(keccak256(abi.encodePacked(collection)));
   }
 
-  // 0x798c6047767c 00 00000000000000000000001d 00 000000000000000000000001
+  // 0x798c6047767c 0000 00000000000000000000001d 000000000000000000000001
   function getTokenId (address collection, bytes12 variantId, bytes12 assetId) public pure returns (bytes32) {
     return bytes32(
       bytes.concat(

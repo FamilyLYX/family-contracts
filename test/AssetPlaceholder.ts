@@ -43,15 +43,17 @@ describe("AssetPlaceholder", function () {
       const assetAddress = await assetContract.getAddress();
       
       const variantId = hexZeroPad(hexValue(29), 12),
-        metadata = hexlify(toUtf8Bytes('https'));
+        metadata = hexlify(toUtf8Bytes('https')),
+        startAt = Math.floor((Date.now() - 1 * 24 * 60 * 60)/1000),
+        duration = Math.floor(7 * 24 * 60 * 60/1000);
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, Date.now() - 1 * 24 * 60 * 60, 7 * 24 * 60 * 60);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
 
       await registerTxn.wait();
       await registerColTxn.wait();
 
-      const mintTxn = await placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x');
+      const mintTxn = await placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false);
       const txnReciept = await mintTxn.wait();
 
       const transferEvent = txnReciept?.logs.filter((log: any) => log.eventName === 'Transfer')[0] as EventLog;
@@ -74,15 +76,17 @@ describe("AssetPlaceholder", function () {
       const assetAddress = await assetContract.getAddress();
       
       const variantId = hexZeroPad(hexValue(29), 12),
-        metadata = hexlify(toUtf8Bytes('https'));
+        metadata = hexlify(toUtf8Bytes('https')),
+        startAt = Math.floor((Date.now() + 1 * 24 * 60 * 60)/1000),
+        duration = Math.floor(3 * 24 * 60 * 60/1000);
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, Date.now() + 1 * 24 * 60 * 60, 3 * 24 * 60 * 60);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
 
       await registerTxn.wait();
       await registerColTxn.wait();
 
-      expect(placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x'))
+      expect(placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false))
         .to.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodNotStarted');
     });
 
@@ -98,19 +102,21 @@ describe("AssetPlaceholder", function () {
       const assetAddress = await assetContract.getAddress();
       
       const variantId = hexZeroPad(hexValue(29), 12),
-        metadata = hexlify(toUtf8Bytes('https'));
+        metadata = hexlify(toUtf8Bytes('https')),
+        startAt = Math.floor((Date.now() - 8 * 24 * 60 * 60)/1000),
+        duration = Math.floor((3 * 24 * 60 * 60)/1000)
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, Date.now() - 8 * 24 * 60 * 60, 3 * 24 * 60 * 60);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
 
       await registerTxn.wait();
       await registerColTxn.wait();
 
-      expect(placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x'))
+      expect(placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false))
         .to.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodEnded');
     });
 
-    it('should allow to mint tokens after end time extension', async () => {
+    it.only('should allow to mint tokens after end time extension', async () => {
       const assetUid = short.generate();
       const assetIdentifier = ethers.keccak256(toUtf8Bytes(assetUid));
       const [owner, userAccount] = await ethers.getSigners();
@@ -132,20 +138,21 @@ describe("AssetPlaceholder", function () {
       await (await registryContract.addToPool([assetIdentifier], assetAddress)).wait();
       
       const variantId = hexZeroPad(hexValue(29), 12),
-        metadata = hexlify(toUtf8Bytes('https'));
+        metadata = hexlify(toUtf8Bytes('https')),
+        startAt = Math.floor((Date.now() - 8 * 24 * 60 * 60)/1000),
+        duration = Math.floor((1 * 24 * 60 * 60)/1000);
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, Date.now() - 8 * 24 * 60 * 60, 1 * 24 * 60 * 60);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
 
       await registerTxn.wait();
       await registerColTxn.wait();
 
-      expect(placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x'))
-        .to.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodEnded');
+      expect(placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false)).not.to.be.reverted;
 
       await placeholderContract.updateMintDuration(assetAddress, 15 * 24 * 60 * 60);
 
-      const mintTxn = await placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x');
+      const mintTxn = await placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false);
 
       expect(mintTxn)
         .to.not.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodEnded');

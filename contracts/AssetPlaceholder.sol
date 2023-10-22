@@ -37,7 +37,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
 
     struct CollectionMeta {
       uint48 startAt;
-      uint48 duration;
+      uint48 endAt;
       uint96 count;
     }
 
@@ -85,7 +85,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         revert CollectionAlreadyRegistered();
       }
 
-      CollectionMeta memory meta = CollectionMeta(startAt/1000, duration/1000, 0);
+      CollectionMeta memory meta = CollectionMeta(startAt, startAt + duration, 0);
 
       collectionMeta[collection] = meta;
       collections[collectionId] = collection;
@@ -98,7 +98,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         revert CollectionNotRegistered();
       }
 
-      collectionMeta[collection].duration = duration;
+      collectionMeta[collection].endAt = collectionMeta[collection].startAt + duration;
     }
 
     function register (string memory uid, bytes memory signature, bytes32 _tokenId) public {
@@ -154,7 +154,8 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         address collection,
         bytes12 variantId,
         bool allowNonLSP1Recipient,
-        bytes memory data
+        bytes memory data,
+        bool frozen
     ) public onlyOwner {
       bytes6 collectionId = TokenUtils.collectionId(collection);
       CollectionMeta memory meta = collectionMeta[collection];
@@ -163,7 +164,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         revert MintingPeriodNotStarted();
       }
 
-      if (block.timestamp > meta.startAt + meta.duration) {
+      if (block.timestamp > meta.endAt) {
         revert MintingPeriodEnded();
       }
 
@@ -172,6 +173,10 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
       bytes32 tokenId = TokenUtils.getTokenId(collection, variantId, assetId);
 
       _mint(to, tokenId, allowNonLSP1Recipient, data);
+
+      if (frozen) {
+        _frozen.add(tokenId);
+      }
     }
 
     function _prepareMint(bytes6 collectionId, bytes12 variantId) internal {

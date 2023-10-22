@@ -68,15 +68,17 @@ describe("AssetRegistry", function () {
       await (await registryContract.addToPool([assetIdentifier], assetAddress)).wait();
       
       const variantId = hexZeroPad(hexValue(29), 12),
-        metadata = hexlify(toUtf8Bytes('https'));
+        metadata = hexlify(toUtf8Bytes('https')),
+        startAt = Math.floor((Date.now() - 8 * 24 * 60 * 60)/1000),
+        duration = Math.floor(30 * 24 * 60 * 60 / 1000)
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, Date.now() - 8 * 24 * 60 * 60, 30 * 24 * 60 * 60);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
 
       await registerTxn.wait();
       await registerColTxn.wait();
 
-      const mintTxn = await placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x');
+      const mintTxn = await placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false);
 
       expect(mintTxn)
         .to.not.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodEnded');
