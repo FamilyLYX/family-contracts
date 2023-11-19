@@ -35,6 +35,8 @@ describe("IdentifiablePhysicalAsset", function () {
         assetId = hexZeroPad(hexValue(11), 12),
         metadata = hexlify(toUtf8Bytes('https'));
 
+      expect(await assetContract.supportsInterface('0x30dc5278')).to.be.true;
+
       await assetContract.registerVariant(variantId, metadata);
       const mintTxn = await assetContract.connect(placeholder)
         .mint(userAccount.address, assetId, variantId, true, '0x');
@@ -52,14 +54,14 @@ describe("IdentifiablePhysicalAsset", function () {
     });
 
     it("Should not mint the same asset twice", async function () {
-      // Contracts are deployed using the first signer/account by default
       const [owner, placeholder, userAccount] = await ethers.getSigners();
 
       const IdentifiablePhysicalAsset = await ethers.getContractFactory("IdentifiablePhygitalAsset", options);
       const assetContract = await IdentifiablePhysicalAsset.deploy('IdentifiablePhygitalAsset', 'IPA', owner, 1, placeholder.address);
-      
+
       const variantId = hexZeroPad(hexValue(29), 12),
         assetId = hexZeroPad(hexValue(11), 12),
+        secondAssetid = hexZeroPad(hexValue(12), 12),
         metadata = hexlify(toUtf8Bytes('https'));
 
       await assetContract.registerVariant(variantId, metadata);
@@ -67,10 +69,13 @@ describe("IdentifiablePhysicalAsset", function () {
       await assetContract.connect(placeholder)
         .mint(userAccount.address, assetId, variantId, true, '0x');
 
-
       expect(assetContract.connect(placeholder)
         .mint(userAccount.address, assetId, variantId, true, '0x'))
         .to.be.revertedWithCustomError({ interface: IdentifiablePhysicalAsset.interface }, 'AssetAlreadyRegistered');
+
+      expect(assetContract.connect(placeholder)
+        .mint(userAccount.address, secondAssetid, variantId, true, '0x'))
+        .to.be.revertedWithCustomError({ interface: IdentifiablePhysicalAsset.interface }, 'LSP8CappedSupplyCannotMintOverCap');
     });
   });
 });

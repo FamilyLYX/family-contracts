@@ -116,7 +116,7 @@ describe("AssetPlaceholder", function () {
         .to.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodEnded');
     });
 
-    it.only('should allow to mint tokens after end time extension', async () => {
+    it('should allow to mint tokens after end time extension', async () => {
       const assetUid = short.generate();
       const assetIdentifier = ethers.keccak256(toUtf8Bytes(assetUid));
       const [owner, userAccount] = await ethers.getSigners();

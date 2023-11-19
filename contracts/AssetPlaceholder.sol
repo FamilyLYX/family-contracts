@@ -30,6 +30,8 @@ interface CappedSupply {
   function tokenSupplyCap() external view returns (uint256);
 }
 
+uint16 constant placeholderTokenIdType = 3;
+
 contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
     using BytesLib for bytes;
     using EnumerableSet for EnumerableSet.Bytes32Set;
@@ -66,12 +68,8 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         string memory symbol_,
         address newOwner_,
         address assetRegistry_
-    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_) {
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, placeholderTokenIdType) {
       assetRegistry = assetRegistry_;
-    }
-
-    receive() external payable {
-        emit Received(msg.sender, msg.value);
     }
 
     function registerCollection(address collection, uint48 startAt, uint48 duration) public onlyOwner {

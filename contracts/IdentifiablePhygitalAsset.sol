@@ -9,7 +9,10 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {LSP8IdentifiableDigitalAsset} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8IdentifiableDigitalAsset.sol";
-import {LSP8CappedSupply } from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8CappedSupply.sol";
+import {LSP8CappedSupply} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8CappedSupply.sol";
+import {LSP8Enumerable} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8Enumerable.sol";
+
+import {LSP8IdentifiableDigitalAssetCore} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8IdentifiableDigitalAsset.sol";
 
 import {TokenUtils, TokenId} from './TokenUtils.sol';
 
@@ -27,7 +30,9 @@ interface IAssetVariants {
     ) external;
 }
 
-contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
+uint16 constant tokenIdType = 3;
+
+contract IdentifiablePhygitalAsset is LSP8CappedSupply, LSP8Enumerable, IAssetVariants {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     address public placeholder;
@@ -54,16 +59,8 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
         address newOwner_,
         uint256 maxLimit,
         address placeholderCollection
-    ) LSP8CappedSupply(maxLimit) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_) {
+    ) LSP8CappedSupply(maxLimit) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, tokenIdType) {
         placeholder = placeholderCollection;
-
-        // Set the token id type to be bytes32
-        uint tokenIdType = 4;
-        _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
-    }
-
-    receive() external payable {
-        emit Received(msg.sender, msg.value);
     }
 
     /**
@@ -154,5 +151,23 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
             _interfaceId == type(IAssetVariants).interfaceId ||
             _interfaceId == _INTERFACEID_CAPPED_LSP8 ||
             super.supportsInterface(_interfaceId);
+    }
+
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        bytes32 tokenId,
+        bytes memory data
+    ) internal virtual override(LSP8Enumerable, LSP8IdentifiableDigitalAssetCore) {
+        LSP8Enumerable._beforeTokenTransfer(from, to, tokenId, data);
+    }
+
+    function _mint(
+        address to,
+        bytes32 tokenId,
+        bool force,
+        bytes memory data
+    ) internal virtual override(LSP8CappedSupply, LSP8IdentifiableDigitalAssetCore) {
+        LSP8CappedSupply._mint(to, tokenId, force, data);
     }
 }

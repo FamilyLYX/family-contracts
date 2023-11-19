@@ -19,7 +19,6 @@ contract CustomKeyManager is LSP6KeyManagerCore {
 
   constructor (address target) {
     _target = target;
-    _setupLSP6ReentrancyGuard();
   }
 
   function getTarget() view public returns (address) {
@@ -68,7 +67,7 @@ contract CustomUniversalProfule is LSP0ERC725Account {
   
   function _getExtension(
         bytes4 functionSelector
-    ) internal view override returns (address) {
+    ) internal view returns (address) {
         // Generate the data key relevant for the functionSelector being called
         bytes32 mappedExtensionDataKey = LSP2Utils.generateMappingKey(
             _LSP17_EXTENSION_PREFIX,
