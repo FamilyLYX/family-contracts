@@ -6,6 +6,7 @@ LoadEnv();
 
 import "solidity-docgen";
 import "hardhat-contract-sizer";
+import { hexlify } from "@ethersproject/bytes";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -18,11 +19,11 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    luksoTestnet: {
-      url: 'https://rpc.testnet.lukso.gateway.fm',
-      chainId: 4201,
-      accounts: [process.env.PRIVATE_KEY as string],
-    },
+    // luksoTestnet: {
+    //   url: 'https://rpc.testnet.lukso.gateway.fm',
+    //   chainId: 4201,
+    //   accounts: [process.env.PRIVATE_KEY as string],
+    // },
   },
   docgen: {
     pages: 'files',
