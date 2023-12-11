@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 import {LSP8IdentifiableDigitalAsset} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8IdentifiableDigitalAsset.sol";
-import {LSP17Extendable} from "@lukso/lsp-smart-contracts/contracts/LSP17ContractExtension/LSP17Extendable.sol";
+import {LSP8Enumerable} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8Enumerable.sol";
 
-contract GenesisPerk is LSP8IdentifiableDigitalAsset {
+contract GenesisPerk is LSP8Enumerable {
     event Received(address, uint);
     address minter;
 
@@ -20,8 +20,9 @@ contract GenesisPerk is LSP8IdentifiableDigitalAsset {
         minter = _minter;
     }
 
-    function mint(address receiver, bytes32 tokenId) external {
+    function mint(address receiver) external {
         require(msg.sender == minter, "Sender not minter");
-        _mint(receiver, tokenId, true, "0x");
+        uint256 nextId = _existingTokens + 1;
+        _mint(receiver, bytes32(nextId), true, "0x");
     }
 }

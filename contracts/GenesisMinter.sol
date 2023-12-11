@@ -4,17 +4,18 @@ pragma solidity ^0.8.9;
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-
 import "./constants.sol";
 
 interface IGenesisPerk {
-    function mint(address receiver, bytes32 tokenId) external;
+    function mint(address receiver) external;
 }
 
 contract GenesisMinter {
     address internal genesisCollection;
     address internal genesisPerk;
     address internal owner;
+
+    mapping(string => bool) internal mintedUsers;
 
     error InvalidFamilySignature();
 
@@ -28,6 +29,7 @@ contract GenesisMinter {
     }
 
     function mintGenesis(string memory uid, bytes memory signature) external {
+        require(mintedUsers[uid] == false, "User already minted");
         bytes32 messageHash = keccak256(
             bytes.concat(_MSG_HASH_PREFIX, bytes(uid))
         );
@@ -35,7 +37,10 @@ contract GenesisMinter {
             revert InvalidFamilySignature();
         }
 
-        IGenesisPerk(genesisPerk).mint(msg.sender, "0x");
+        //TODO: add genesis mint function call
+
+        IGenesisPerk(genesisPerk).mint(msg.sender);
+        mintedUsers[uid] = true;
     }
 
     function _isValidSignature(
