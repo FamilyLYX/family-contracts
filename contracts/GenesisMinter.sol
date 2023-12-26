@@ -19,8 +19,8 @@ contract GenesisMinter {
 
     error InvalidFamilySignature();
 
-    constructor() {
-        owner = msg.sender;
+    constructor(address _owner) {
+        owner = _owner;
     }
 
     function setCollections(address genesis, address perk) external {

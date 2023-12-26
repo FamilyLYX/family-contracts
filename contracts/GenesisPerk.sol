@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 import {LSP8IdentifiableDigitalAsset} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8IdentifiableDigitalAsset.sol";
 import {LSP8Enumerable} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8Enumerable.sol";
+import "./constants.sol";
 
 contract GenesisPerk is LSP8Enumerable {
     event Received(address, uint);
@@ -21,8 +22,14 @@ contract GenesisPerk is LSP8Enumerable {
     }
 
     function mint(address receiver) external {
-        require(msg.sender == minter, "Sender not minter");
+        require(
+            msg.sender == minter || msg.sender == owner(),
+            "Sender not minter"
+        );
         uint256 nextId = _existingTokens + 1;
-        _mint(receiver, bytes32(nextId), true, "0x");
+        // // Set the token id type to be bytes32
+        uint tokenIdType = 2;
+        _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
+        _mint(receiver, bytes32(nextId), false, "0x");
     }
 }

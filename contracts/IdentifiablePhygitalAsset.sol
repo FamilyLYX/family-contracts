@@ -73,7 +73,6 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
         LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3)
     {
         placeholder = placeholderCollection;
-
         // Set the token id type to be bytes32
         uint tokenIdType = 4;
         _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
