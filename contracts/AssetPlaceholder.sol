@@ -20,14 +20,18 @@ import {BytesLib} from "solidity-bytes-utils/contracts/BytesLib.sol";
 
 import {IAssetVariants} from "./IdentifiablePhygitalAsset.sol";
 import {IAssetRegistry} from "./AssetRegistry.sol";
-import {TokenUtils, TokenId} from './TokenUtils.sol';
+import {TokenUtils, TokenId} from "./TokenUtils.sol";
 
 interface IAssetPlaceholder {
-  function register(bytes32 uid, address collection, bytes32 tokenId) external;
+    function register(
+        bytes32 uid,
+        address collection,
+        bytes32 tokenId
+    ) external;
 }
 
 interface CappedSupply {
-  function tokenSupplyCap() external view returns (uint256);
+    function tokenSupplyCap() external view returns (uint256);
 }
 
 contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
@@ -36,9 +40,9 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
     using TokenUtils for TokenId;
 
     struct CollectionMeta {
-      uint48 startAt;
-      uint48 endAt;
-      uint96 count;
+        uint48 startAt;
+        uint48 endAt;
+        uint96 count;
     }
 
     address public assetRegistry;
@@ -66,87 +70,116 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         string memory symbol_,
         address newOwner_,
         address assetRegistry_
-    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_) {
-      assetRegistry = assetRegistry_;
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3) {
+        assetRegistry = assetRegistry_;
     }
 
-    receive() external payable {
-        emit Received(msg.sender, msg.value);
+    // receive() external payable {
+    //     emit Received(msg.sender, msg.value);
+    // }
+
+    function registerCollection(
+        address collection,
+        uint48 startAt,
+        uint48 duration
+    ) public onlyOwner {
+        bytes6 collectionId = TokenUtils.collectionId(collection);
+
+        if (collection == address(0)) {
+            revert CollectionAddressCannotBeZero();
+        }
+
+        if (collections[collectionId] != address(0)) {
+            revert CollectionAlreadyRegistered();
+        }
+
+        CollectionMeta memory meta = CollectionMeta(
+            startAt,
+            startAt + duration,
+            0
+        );
+
+        collectionMeta[collection] = meta;
+        collections[collectionId] = collection;
     }
 
-    function registerCollection(address collection, uint48 startAt, uint48 duration) public onlyOwner {
-      bytes6 collectionId = TokenUtils.collectionId(collection);
+    function updateMintDuration(
+        address collection,
+        uint48 duration
+    ) public onlyOwner {
+        bytes6 collectionId = TokenUtils.collectionId(collection);
 
-      if (collection == address(0)) {
-        revert CollectionAddressCannotBeZero();
-      }
+        if (collections[collectionId] == address(0)) {
+            revert CollectionNotRegistered();
+        }
 
-      if (collections[collectionId] != address(0)) {
-        revert CollectionAlreadyRegistered();
-      }
-
-      CollectionMeta memory meta = CollectionMeta(startAt, startAt + duration, 0);
-
-      collectionMeta[collection] = meta;
-      collections[collectionId] = collection;
+        collectionMeta[collection].endAt =
+            collectionMeta[collection].startAt +
+            duration;
     }
 
-    function updateMintDuration (address collection, uint48 duration) public onlyOwner {
-      bytes6 collectionId = TokenUtils.collectionId(collection);
+    function register(
+        string memory uid,
+        bytes memory signature,
+        bytes32 _tokenId
+    ) public {
+        address operator = msg.sender;
+        bytes32 messageHash = keccak256(
+            bytes.concat(_MSG_HASH_PREFIX, bytes(uid))
+        );
 
-      if (collections[collectionId] == address(0)) {
-        revert CollectionNotRegistered();
-      }
+        if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
+            revert InvalidFamilySignature();
+        }
 
-      collectionMeta[collection].endAt = collectionMeta[collection].startAt + duration;
-    }
+        if (!_isOperatorOrOwner(operator, _tokenId)) {
+            revert LSP8NotTokenOperator(_tokenId, operator);
+        }
 
-    function register (string memory uid, bytes memory signature, bytes32 _tokenId) public {
-      address operator = msg.sender;
-      bytes32 messageHash = keccak256(bytes.concat(_MSG_HASH_PREFIX, bytes(uid)));
-      
-      if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
-        revert InvalidFamilySignature();
-      }
+        if (!_frozen.contains(_tokenId)) {
+            revert TokenNotReadyToBeRegistered();
+        }
 
-      if (!_isOperatorOrOwner(operator, _tokenId)) {
-        revert LSP8NotTokenOperator(_tokenId, operator);
-      }
+        TokenId memory tokenId = TokenUtils.parseTokenId(_tokenId);
+        address collection = collections[tokenId.collectionId];
 
-      if (!_frozen.contains(_tokenId)) {
-        revert TokenNotReadyToBeRegistered();
-      }
+        bytes32 identifier = keccak256(bytes(uid));
 
-      TokenId memory tokenId = TokenUtils.parseTokenId(_tokenId);
-      address collection = collections[tokenId.collectionId];
+        IAssetRegistry(assetRegistry).register(
+            identifier,
+            collection,
+            _tokenId
+        );
 
-      bytes32 identifier = keccak256(bytes(uid));
+        // TODO: Think about where to mint the token to, operator or owner.
+        IAssetVariants(collection).mint(
+            msg.sender,
+            tokenId.assetId,
+            tokenId.variantId,
+            true,
+            "0x"
+        );
 
-      IAssetRegistry(assetRegistry).register(identifier, collection, _tokenId);
-
-      // TODO: Think about where to mint the token to, operator or owner.
-      IAssetVariants(collection).mint(msg.sender, tokenId.assetId, tokenId.variantId, true, '0x');
-
-      // TODO: Add unit test to ensure that if a token is burned, it cannot be minted again.
-      _burn(_tokenId, '0x');
+        // TODO: Add unit test to ensure that if a token is burned, it cannot be minted again.
+        _burn(_tokenId, "0x");
     }
 
     function transfer(
-      address from,
-      address to,
-      bytes32 tokenId,
-      bool allowNonLSP1Recipient,
-      bytes memory data
+        address from,
+        address to,
+        bytes32 tokenId,
+        bool allowNonLSP1Recipient,
+        bytes memory data
     ) public override {
-      if (_frozen.contains(tokenId)) {
-        revert TokenIsFrozen();
-      }
+        if (_frozen.contains(tokenId)) {
+            revert TokenIsFrozen();
+        }
 
-      _transfer(from, to, tokenId, allowNonLSP1Recipient, data);
+        _transfer(from, to, tokenId, allowNonLSP1Recipient, data);
     }
 
-    function freeze (bytes32 tokenId) public onlyOwner {
-      _frozen.add(tokenId);
+    function freeze(bytes32 tokenId) public onlyOwner {
+        _frozen.add(tokenId);
     }
 
     function mint(
@@ -157,70 +190,78 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         bytes memory data,
         bool frozen
     ) public onlyOwner {
-      bytes6 collectionId = TokenUtils.collectionId(collection);
-      CollectionMeta memory meta = collectionMeta[collection];
+        bytes6 collectionId = TokenUtils.collectionId(collection);
+        CollectionMeta memory meta = collectionMeta[collection];
 
-      if (block.timestamp < meta.startAt) {
-        revert MintingPeriodNotStarted();
-      }
+        if (block.timestamp < meta.startAt) {
+            revert MintingPeriodNotStarted();
+        }
 
-      if (block.timestamp > meta.endAt) {
-        revert MintingPeriodEnded();
-      }
+        if (block.timestamp > meta.endAt) {
+            revert MintingPeriodEnded();
+        }
 
-      _prepareMint(collectionId, variantId);
-      bytes12 assetId = bytes12(abi.encodePacked(collectionMeta[collection].count));
-      bytes32 tokenId = TokenUtils.getTokenId(collection, variantId, assetId);
+        _prepareMint(collectionId, variantId);
+        bytes12 assetId = bytes12(
+            abi.encodePacked(collectionMeta[collection].count)
+        );
+        bytes32 tokenId = TokenUtils.getTokenId(collection, variantId, assetId);
 
-      _mint(to, tokenId, allowNonLSP1Recipient, data);
+        _mint(to, tokenId, allowNonLSP1Recipient, data);
 
-      if (frozen) {
-        _frozen.add(tokenId);
-      }
+        if (frozen) {
+            _frozen.add(tokenId);
+        }
     }
 
     function _prepareMint(bytes6 collectionId, bytes12 variantId) internal {
-      address collection = collections[collectionId];
-      uint96 mintCount = collectionMeta[collection].count;
-
-      if (collection == address(0)) {
-        revert CollectionNotRegistered();
-      }
-
-      if (IERC165(collection).supportsInterface(_INTERFACEID_CAPPED_LSP8)) {
-        uint256 mintLimit = CappedSupply(collection).tokenSupplyCap();
-
-        if (uint256(mintCount) == mintLimit) {
-          revert MintLimitReachedForCollection();
-        }
-      }
-
-      if (IERC165(collection).supportsInterface(type(IAssetVariants).interfaceId)) {
-        if (!IAssetVariants(collection).checkVariant(variantId)) {
-          revert VariantNotRegistered();
-        }
-      }
-
-      collectionMeta[collection].count = mintCount + 1;
-    }
-
-    function _getData(bytes32 dataKey) internal override view returns (bytes memory dataValue) {
-      bytes10 mappingKeyPrefix = bytes10(dataKey);
-
-      if (mappingKeyPrefix == _LSP8_TOKEN_METADATA_KEY_PREFIX) {
-        TokenId memory tokenId = TokenUtils.parseDataKey(dataKey);
-        address collection = collections[tokenId.collectionId];
+        address collection = collections[collectionId];
+        uint96 mintCount = collectionMeta[collection].count;
 
         if (collection == address(0)) {
-          return _store[dataKey];
+            revert CollectionNotRegistered();
         }
 
-        bytes32 referredDataKey = TokenUtils.getDataKey(tokenId);
+        if (IERC165(collection).supportsInterface(_INTERFACEID_CAPPED_LSP8)) {
+            uint256 mintLimit = CappedSupply(collection).tokenSupplyCap();
 
-        return IERC725Y(collection).getData(referredDataKey);
-      }
+            if (uint256(mintCount) == mintLimit) {
+                revert MintLimitReachedForCollection();
+            }
+        }
 
-      return _store[dataKey];
+        if (
+            IERC165(collection).supportsInterface(
+                type(IAssetVariants).interfaceId
+            )
+        ) {
+            if (!IAssetVariants(collection).checkVariant(variantId)) {
+                revert VariantNotRegistered();
+            }
+        }
+
+        collectionMeta[collection].count = mintCount + 1;
+    }
+
+    function _getData(
+        bytes32 dataKey
+    ) internal view override returns (bytes memory dataValue) {
+        bytes10 mappingKeyPrefix = bytes10(dataKey);
+
+        if (mappingKeyPrefix == _LSP8_TOKEN_METADATA_KEY_PREFIX) {
+            TokenId memory tokenId = TokenUtils.parseDataKey(dataKey);
+            address collection = collections[tokenId.collectionId];
+
+            if (collection == address(0)) {
+                return _store[dataKey];
+            }
+
+            bytes32 referredDataKey = TokenUtils.getDataKey(tokenId);
+
+            return IERC725Y(collection).getData(referredDataKey);
+        }
+
+        return _store[dataKey];
     }
 
     function supportsInterface(
@@ -234,7 +275,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
     function _isValidSignature(
         bytes32 dataHash,
         bytes memory signature
-    ) internal view  returns (bytes4 magicValue) {
+    ) internal view returns (bytes4 magicValue) {
         address _owner = owner();
 
         // If owner is a contract

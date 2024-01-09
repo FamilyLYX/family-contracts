@@ -30,18 +30,20 @@ interface IAssetVariants {
 
     function mint(
         address to,
-        bytes12 assetId,
         bytes12 variantId,
         bool allowNonLSP1Recipient,
         bytes memory data
     ) external;
 }
 
-contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
+contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
     using EnumerableSet for EnumerableSet.Bytes32Set;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
-    address public placeholder;
     EnumerableSet.Bytes32Set internal _variants;
+    EnumerableSet.AddressSet internal whitelistedMarketplaces;
+
+    address internal minter;
 
     event Received(address, uint);
     event VariantRegistered(bytes12 variantId);
@@ -52,7 +54,7 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
         bytes32 indexed tokenId
     );
 
-    error OnlyPlaceholderCanMint();
+    error OnlyMinterCanMint();
 
     error VariantAlreadyRegistered();
     error VariantNotRegistered();
@@ -66,16 +68,12 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
         string memory name_,
         string memory symbol_,
         address newOwner_,
-        uint256 maxLimit,
-        address placeholderCollection
-    )
-        LSP8CappedSupply(maxLimit)
-        LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3)
-    {
-        placeholder = placeholderCollection;
+        address _minter
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3) {
         // Set the token id type to be bytes32
-        uint tokenIdType = 4;
-        _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
+        // uint tokenIdType = 3;
+        // _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
+        minter = _minter;
     }
 
     // receive() external payable {
@@ -86,31 +84,30 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
      * Mint a token for an asset of a specific variant
      *
      * @param to Address of the UP to mint token to
-     * @param assetId A bytes12 long identifier for an asset
      * @param variantId A bytes12 long identifier for a variant
      * @param allowNonLSP1Recipient A bool to check if only minting should only be allowed to UPs
      * @param data arbitary data
      */
     function mint(
         address to,
-        bytes12 assetId,
         bytes12 variantId,
         bool allowNonLSP1Recipient,
         bytes memory data
     ) public {
-        if (msg.sender != placeholder) {
-            revert OnlyPlaceholderCanMint();
+        if (msg.sender != minter) {
+            revert OnlyMinterCanMint();
         }
 
+        bytes12 assetId = bytes12(abi.encodePacked(_existingTokens + 1));
         if (assetId == bytes12(0)) {
             revert AssetIdCannotBeZero();
         }
-
         TokenId memory tokenIdObj = TokenId(
             TokenUtils.collectionId(address(this)),
             variantId,
             assetId
         );
+
         bytes32 variantDataKey = TokenUtils.getDataKey(tokenIdObj);
 
         if (!_variants.contains(variantDataKey)) {
@@ -122,10 +119,43 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, IAssetVariants {
         if (_exists(tokenId)) {
             revert AssetAlreadyRegistered();
         }
+        bytes memory metadata = getData(variantId);
+        bytes32 metadataKey = bytes32(
+            bytes.concat(_LSP8_TOKEN_METADATA_KEY_PREFIX, tokenId)
+        );
 
         _mint(to, tokenId, allowNonLSP1Recipient, data);
+        setData(metadataKey, metadata);
 
         emit AssetMinted(variantId, assetId, tokenId);
+    }
+
+    function whitelistMarketplace(address _marketplace) public onlyOwner {
+        require(
+            !whitelistedMarketplaces.contains(_marketplace),
+            "Already Whitelisted"
+        );
+        whitelistedMarketplaces.add(_marketplace);
+    }
+
+    function removeMarketplace(address _marketplace) public onlyOwner {
+        require(
+            whitelistedMarketplaces.contains(_marketplace),
+            "Marketplace not whitelisted"
+        );
+        whitelistedMarketplaces.remove(_marketplace);
+    }
+
+    function authorizeOperator(
+        address operator,
+        bytes32 tokenId,
+        bytes memory operatorNotificationData
+    ) public override {
+        require(
+            whitelistedMarketplaces.contains(operator),
+            "Operator not whitelisted"
+        );
+        super.authorizeOperator(operator, tokenId, operatorNotificationData);
     }
 
     function registerVariant(
