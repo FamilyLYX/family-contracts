@@ -17,7 +17,7 @@ contract GenesisPerk is LSP8Enumerable {
         string memory symbol_,
         address newOwner_,
         address _minter
-    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3) {
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 1, 0) {
         minter = _minter;
     }
 
@@ -28,7 +28,7 @@ contract GenesisPerk is LSP8Enumerable {
         );
         uint256 nextId = _existingTokens + 1;
         // // Set the token id type to be bytes32
-        uint tokenIdType = 2;
+        uint tokenIdType = 0;
         _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
         _mint(receiver, bytes32(nextId), false, "0x");
     }
