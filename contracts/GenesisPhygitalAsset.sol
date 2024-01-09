@@ -36,12 +36,14 @@ interface IAssetVariants {
     ) external;
 }
 
-contract GenesisPhygitalAsset is LSP8CappedSupply, IAssetVariants {
+contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     EnumerableSet.Bytes32Set internal _variants;
     EnumerableSet.AddressSet internal whitelistedMarketplaces;
+
+    address internal minter;
 
     event Received(address, uint);
     event VariantRegistered(bytes12 variantId);
@@ -52,7 +54,7 @@ contract GenesisPhygitalAsset is LSP8CappedSupply, IAssetVariants {
         bytes32 indexed tokenId
     );
 
-    error OnlyPlaceholderCanMint();
+    error OnlyMinterCanMint();
 
     error VariantAlreadyRegistered();
     error VariantNotRegistered();
@@ -66,14 +68,12 @@ contract GenesisPhygitalAsset is LSP8CappedSupply, IAssetVariants {
         string memory name_,
         string memory symbol_,
         address newOwner_,
-        uint256 maxLimit
-    )
-        LSP8CappedSupply(maxLimit)
-        LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3)
-    {
+        address _minter
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3) {
         // Set the token id type to be bytes32
-        uint tokenIdType = 3;
-        _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
+        // uint tokenIdType = 3;
+        // _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
+        minter = _minter;
     }
 
     // receive() external payable {
@@ -93,10 +93,10 @@ contract GenesisPhygitalAsset is LSP8CappedSupply, IAssetVariants {
         bytes12 variantId,
         bool allowNonLSP1Recipient,
         bytes memory data
-    ) public onlyOwner {
-        // if (msg.sender != placeholder) {
-        //     revert OnlyPlaceholderCanMint();
-        // }
+    ) public {
+        if (msg.sender != minter) {
+            revert OnlyMinterCanMint();
+        }
 
         bytes12 assetId = bytes12(abi.encodePacked(_existingTokens + 1));
         if (assetId == bytes12(0)) {
