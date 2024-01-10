@@ -7,7 +7,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "./constants.sol";
 
 interface IGenesisPerk {
-    function mint(address receiver) external;
+    function mint(address receiver, uint256 amount) external;
 }
 
 interface IGenesisCollection {
@@ -42,18 +42,36 @@ contract GenesisMinter {
         bytes12 variantId,
         bool allowNonLSP1Recipient,
         bytes memory data,
+        uint256 amount,
         string memory uid
     ) external {
         require(mintedUsers[uid] == false, "User already minted");
         require(msg.sender == owner, "Only FamilyUP can mint");
 
-        IGenesisCollection(genesisCollection).mint(
-            to,
-            variantId,
-            allowNonLSP1Recipient,
-            data
-        );
-        IGenesisPerk(genesisPerk).mint(to);
+        if (amount > 1) {
+            for (uint256 i; i < amount; ) {
+                IGenesisCollection(genesisCollection).mint(
+                    to,
+                    variantId,
+                    allowNonLSP1Recipient,
+                    data
+                );
+
+                // Increment the iterator in unchecked block to save gas
+                unchecked {
+                    ++i;
+                }
+            }
+        } else {
+            IGenesisCollection(genesisCollection).mint(
+                to,
+                variantId,
+                allowNonLSP1Recipient,
+                data
+            );
+        }
+
+        IGenesisPerk(genesisPerk).mint(to, amount);
         mintedUsers[uid] = true;
     }
 }

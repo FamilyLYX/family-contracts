@@ -16,12 +16,12 @@ contract LSP7Perk is LSP7DigitalAsset {
         minter = _minter;
     }
 
-    function mint(address receiver) external {
+    function mint(address receiver, uint256 amount) external {
         require(
             msg.sender == minter || msg.sender == owner(),
             "Sender not minter"
         );
         // // Set the token id type to be bytes32
-        _mint(receiver, 1, false, "0x");
+        _mint(receiver, amount, false, "0x");
     }
 }
