@@ -31,6 +31,7 @@ interface IAssetVariants {
     function mint(
         address to,
         bytes12 variantId,
+        uint256 amount,
         bool allowNonLSP1Recipient,
         bytes memory data
     ) external;
@@ -42,8 +43,6 @@ contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
 
     EnumerableSet.Bytes32Set internal _variants;
     EnumerableSet.AddressSet internal whitelistedMarketplaces;
-
-    address internal minter;
 
     event Received(address, uint);
     event VariantRegistered(bytes12 variantId);
@@ -67,14 +66,8 @@ contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
     constructor(
         string memory name_,
         string memory symbol_,
-        address newOwner_,
-        address _minter
-    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3) {
-        // Set the token id type to be bytes32
-        // uint tokenIdType = 3;
-        // _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
-        minter = _minter;
-    }
+        address newOwner_
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 2, 0) {}
 
     // receive() external payable {
     //     emit Received(msg.sender, msg.value);
@@ -91,43 +84,47 @@ contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
     function mint(
         address to,
         bytes12 variantId,
+        uint256 amount,
         bool allowNonLSP1Recipient,
         bytes memory data
-    ) public {
-        if (msg.sender != minter) {
-            revert OnlyMinterCanMint();
+    ) public onlyOwner {
+        for (uint256 i; i < amount; ) {
+            bytes12 assetId = bytes12(uint96(_existingTokens + 1));
+            if (assetId == bytes12(0)) {
+                revert AssetIdCannotBeZero();
+            }
+            TokenId memory tokenIdObj = TokenId(
+                TokenUtils.collectionId(address(this)),
+                variantId,
+                assetId
+            );
+
+            bytes32 variantDataKey = TokenUtils.getDataKey(tokenIdObj);
+
+            if (!_variants.contains(variantDataKey)) {
+                revert VariantNotRegistered();
+            }
+
+            bytes32 tokenId = TokenUtils.getTokenId(tokenIdObj);
+
+            if (_exists(tokenId)) {
+                revert AssetAlreadyRegistered();
+            }
+            bytes memory metadata = getData(variantId);
+            bytes32 metadataKey = bytes32(
+                bytes.concat(_LSP8_TOKEN_METADATA_KEY_PREFIX, tokenId)
+            );
+
+            _mint(to, tokenId, allowNonLSP1Recipient, data);
+            setData(metadataKey, metadata);
+
+            emit AssetMinted(variantId, assetId, tokenId);
+
+            // Increment the iterator in unchecked block to save gas
+            unchecked {
+                ++i;
+            }
         }
-
-        bytes12 assetId = bytes12(abi.encodePacked(_existingTokens + 1));
-        if (assetId == bytes12(0)) {
-            revert AssetIdCannotBeZero();
-        }
-        TokenId memory tokenIdObj = TokenId(
-            TokenUtils.collectionId(address(this)),
-            variantId,
-            assetId
-        );
-
-        bytes32 variantDataKey = TokenUtils.getDataKey(tokenIdObj);
-
-        if (!_variants.contains(variantDataKey)) {
-            revert VariantNotRegistered();
-        }
-
-        bytes32 tokenId = TokenUtils.getTokenId(tokenIdObj);
-
-        if (_exists(tokenId)) {
-            revert AssetAlreadyRegistered();
-        }
-        bytes memory metadata = getData(variantId);
-        bytes32 metadataKey = bytes32(
-            bytes.concat(_LSP8_TOKEN_METADATA_KEY_PREFIX, tokenId)
-        );
-
-        _mint(to, tokenId, allowNonLSP1Recipient, data);
-        setData(metadataKey, metadata);
-
-        emit AssetMinted(variantId, assetId, tokenId);
     }
 
     function whitelistMarketplace(address _marketplace) public onlyOwner {
