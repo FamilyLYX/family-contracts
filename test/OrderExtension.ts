@@ -43,7 +43,7 @@ async function setupAssets (signer: SignerWithAddress, owner: string) {
     duration = Math.floor(30 * 24 * 60 * 60/1000)
 
   const registerTxn = await assetContract.connect(signer).registerVariant(variantId, metadata);
-  const registerColTxn = await placeholderContract.connect(signer).registerCollection(assetAddress, startAt, duration);
+  const registerColTxn = await placeholderContract.connect(signer).registerCollection(assetAddress, startAt, duration, false);
 
   await registerTxn.wait();
   await registerColTxn.wait();

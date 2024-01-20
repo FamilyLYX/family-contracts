@@ -73,7 +73,7 @@ describe("AssetRegistry", function () {
         duration = Math.floor(30 * 24 * 60 * 60 / 1000)
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration, false);
 
       await registerTxn.wait();
       await registerColTxn.wait();

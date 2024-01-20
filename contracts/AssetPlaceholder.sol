@@ -41,6 +41,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
       uint48 startAt;
       uint48 endAt;
       uint96 count;
+      bool digital;
     }
 
     address public assetRegistry;
@@ -72,7 +73,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
       assetRegistry = assetRegistry_;
     }
 
-    function registerCollection(address collection, uint48 startAt, uint48 duration) public onlyOwner {
+    function registerCollection(address collection, uint48 startAt, uint48 duration, bool digital) public onlyOwner {
       bytes6 collectionId = TokenUtils.collectionId(collection);
 
       if (collection == address(0)) {
@@ -83,7 +84,7 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         revert CollectionAlreadyRegistered();
       }
 
-      CollectionMeta memory meta = CollectionMeta(startAt, startAt + duration, 0);
+      CollectionMeta memory meta = CollectionMeta(startAt, startAt + duration, 0, digital);
 
       collectionMeta[collection] = meta;
       collections[collectionId] = collection;
@@ -170,7 +171,12 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
       bytes12 assetId = bytes12(abi.encodePacked(collectionMeta[collection].count));
       bytes32 tokenId = TokenUtils.getTokenId(collection, variantId, assetId);
 
-      _mint(to, tokenId, allowNonLSP1Recipient, data);
+      if (meta.digital) {
+        IAssetVariants(collection).mint(to, assetId, variantId, true, '0x');
+      }
+      else {
+        _mint(to, tokenId, allowNonLSP1Recipient, data);
+      }
 
       if (frozen) {
         _frozen.add(tokenId);
@@ -228,6 +234,13 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
             _interfaceId == type(IAssetPlaceholder).interfaceId ||
             super.supportsInterface(_interfaceId);
     }
+
+    // Override this method to prevent this token to be shown in users wallets
+    function _notifyTokenReceiver(
+        address to,
+        bool force,
+        bytes memory lsp1Data
+    ) internal override {}
 
     function _isValidSignature(
         bytes32 dataHash,

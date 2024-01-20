@@ -19,18 +19,6 @@ describe("AssetPlaceholder", function () {
   });
 
   describe("Deployment", function () {
-    it("Should set the right properties", async function () {
-      // Contracts are deployed using the first signer/account by default
-      const [owner, registry, userAccount] = await ethers.getSigners();
-
-      const AssetPlaceholder = await ethers.getContractFactory("AssetPlaceholder", options);
-      const assetContract = await AssetPlaceholder.deploy('IdentifiablePhygitalAsset', 'IPA', owner, registry.address);
-    
-      const tokenMetadataKey = ERC725.encodeKeyName('LSP8MetadataTokenURI:<bytes32>', [hexZeroPad(hexValue(1), 32)]);
-
-      await assetContract.getData(tokenMetadataKey);
-    });
-
     it('should read token metadata from parent collection', async function () {
       const [owner, registry, userAccount] = await ethers.getSigners();
 
@@ -48,7 +36,7 @@ describe("AssetPlaceholder", function () {
         duration = Math.floor(7 * 24 * 60 * 60/1000);
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration, false);
 
       await registerTxn.wait();
       await registerColTxn.wait();
@@ -81,7 +69,7 @@ describe("AssetPlaceholder", function () {
         duration = Math.floor(3 * 24 * 60 * 60/1000);
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration, false);
 
       await registerTxn.wait();
       await registerColTxn.wait();
@@ -107,7 +95,7 @@ describe("AssetPlaceholder", function () {
         duration = Math.floor((3 * 24 * 60 * 60)/1000)
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration, false);
 
       await registerTxn.wait();
       await registerColTxn.wait();
@@ -143,7 +131,7 @@ describe("AssetPlaceholder", function () {
         duration = Math.floor((1 * 24 * 60 * 60)/1000);
 
       const registerTxn = await assetContract.registerVariant(variantId, metadata);
-      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration, false);
 
       await registerTxn.wait();
       await registerColTxn.wait();
@@ -168,6 +156,56 @@ describe("AssetPlaceholder", function () {
       const tokenRegisterTxn = await placeholderContract.connect(userAccount).register(assetUid, signature, tokenId);
 
       await tokenRegisterTxn.wait();
+    });
+
+    it('[digital] should allow to mint tokens after end time extension', async () => {
+      const assetUid = short.generate();
+      const assetIdentifier = ethers.keccak256(toUtf8Bytes(assetUid));
+      const [owner, userAccount] = await ethers.getSigners();
+
+      const AssetRegistry = await ethers.getContractFactory("AssetRegistry");
+      const registryContract = await AssetRegistry.deploy(owner);
+      const registryAddr = await registryContract.getAddress();
+
+      const AssetPlaceholder = await ethers.getContractFactory("AssetPlaceholder", options);
+      const placeholderContract = await AssetPlaceholder.deploy('PhygitalAssetPlaceholder', 'PAP', owner, registryAddr);
+      const placeholderAddr = await placeholderContract.getAddress();
+
+      const IdentifiablePhygitalAsset = await ethers.getContractFactory("IdentifiablePhygitalAsset", options);
+      const assetContract = await IdentifiablePhygitalAsset.deploy('IdentifiablePhygitalAsset', 'IPA', owner, 1, placeholderAddr);
+      const assetAddress = await assetContract.getAddress();
+
+      // Register placeholder as registar on asset registry
+      await (await registryContract.addAddress(placeholderAddr)).wait();
+      await (await registryContract.addToPool([assetIdentifier], assetAddress)).wait();
+      
+      const variantId = hexZeroPad(hexValue(29), 12),
+        metadata = hexlify(toUtf8Bytes('https')),
+        startAt = Math.floor((Date.now() - 8 * 24 * 60 * 60)/1000),
+        duration = Math.floor((1 * 24 * 60 * 60)/1000);
+
+      const registerTxn = await assetContract.registerVariant(variantId, metadata);
+      const registerColTxn = await placeholderContract.registerCollection(assetAddress, startAt, duration, true);
+
+      await registerTxn.wait();
+      await registerColTxn.wait();
+
+      expect(placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false)).not.to.be.reverted;
+
+      await placeholderContract.updateMintDuration(assetAddress, 15 * 24 * 60 * 60);
+
+      const mintTxn = await placeholderContract.mint(userAccount.address, assetAddress, variantId, true, '0x', false);
+
+      expect(mintTxn)
+        .to.not.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodEnded');
+
+      await mintTxn.wait();
+
+      const placeholderTokenIds = await placeholderContract.tokenIdsOf(userAccount.address);
+      const tokenIds = await assetContract.tokenIdsOf(userAccount.address);
+
+      expect(placeholderTokenIds.length).to.equal(0);
+      expect(tokenIds.length).to.equal(1);
     });
   });
 });
