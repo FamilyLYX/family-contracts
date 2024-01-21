@@ -9,6 +9,7 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {LSP8IdentifiableDigitalAsset} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8IdentifiableDigitalAsset.sol";
+import {LSP8Enumerable} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8Enumerable.sol";
 import {LSP8CappedSupply} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8CappedSupply.sol";
 
 import {TokenUtils, TokenId} from "./TokenUtils.sol";
@@ -37,7 +38,7 @@ interface IAssetVariants {
     ) external;
 }
 
-contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
+contract GenesisPhygitalAsset is LSP8Enumerable, IAssetVariants {
     using EnumerableSet for EnumerableSet.Bytes32Set;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -49,7 +50,6 @@ contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
     event VariantUnregistered(bytes12 variantId);
     event AssetMinted(
         bytes12 indexed variantId,
-        bytes12 indexed assetId,
         bytes32 indexed tokenId
     );
 
@@ -89,36 +89,22 @@ contract GenesisPhygitalAsset is LSP8IdentifiableDigitalAsset, IAssetVariants {
         bytes memory data
     ) public onlyOwner {
         for (uint256 i; i < amount; ) {
-            bytes12 assetId = bytes12(uint96(_existingTokens + 1));
-            if (assetId == bytes12(0)) {
-                revert AssetIdCannotBeZero();
-            }
-            TokenId memory tokenIdObj = TokenId(
-                TokenUtils.collectionId(address(this)),
-                variantId,
-                assetId
-            );
-
-            bytes32 variantDataKey = TokenUtils.getDataKey(tokenIdObj);
+            bytes32 tokenId = bytes32(uint256(_existingTokens + 1));
+            bytes32 variantDataKey = TokenUtils.getDataKey(address(this), variantId);
 
             if (!_variants.contains(variantDataKey)) {
                 revert VariantNotRegistered();
             }
 
-            bytes32 tokenId = TokenUtils.getTokenId(tokenIdObj);
-
             if (_exists(tokenId)) {
                 revert AssetAlreadyRegistered();
             }
-            bytes memory metadata = getData(variantId);
-            bytes32 metadataKey = bytes32(
-                bytes.concat(_LSP8_TOKEN_METADATA_KEY_PREFIX, tokenId)
-            );
 
+            bytes memory metadata = _getData(variantDataKey);
             _mint(to, tokenId, allowNonLSP1Recipient, data);
-            setData(metadataKey, metadata);
+            _setDataForTokenId(tokenId, _LSP4_METADATA_KEY, metadata);
 
-            emit AssetMinted(variantId, assetId, tokenId);
+            emit AssetMinted(variantId, tokenId);
 
             // Increment the iterator in unchecked block to save gas
             unchecked {

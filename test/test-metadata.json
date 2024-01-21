@@ -1,0 +1,45 @@
+{
+  "LSP4Metadata": {
+    "description": "This is a token",
+    "links": [
+      { "title": "CG", "url": "http://app.cg/c/bZe26yK9Uh/" },
+      { "title": "X", "url": "https://twitter.com/chillwhales" }
+    ],
+    "icon": [
+      {
+        "width": 1755,
+        "height": 1614,
+        "url": "ipfs://bafkreieesrgi63acpc4eyposbreqv3xhxk74mfpalsg6mrasiht4qixbly",
+        "verification": {
+          "method": "keccak256(bytes)",
+          "data": "0x26f7011738479e8c06619ef74fb1c194fd8d031855e8759c1c7b0b0dbb2b1324"
+        }
+      }
+    ],
+    "backgroundImage": [
+      {
+        "width": 1755,
+        "height": 1614,
+        "url": "ipfs://bafkreieesrgi63acpc4eyposbreqv3xhxk74mfpalsg6mrasiht4qixbly",
+        "verification": {
+          "method": "keccak256(bytes)",
+          "data": "0x26f7011738479e8c06619ef74fb1c194fd8d031855e8759c1c7b0b0dbb2b1324"
+        }
+      }
+    ],
+    "assets": [],
+    "images": [
+      [
+        {
+          "width": 1755,
+          "height": 1614,
+          "url": "ipfs://bafkreieesrgi63acpc4eyposbreqv3xhxk74mfpalsg6mrasiht4qixbly",
+          "verification": {
+            "method": "keccak256(bytes)",
+            "data": "0x26f7011738479e8c06619ef74fb1c194fd8d031855e8759c1c7b0b0dbb2b1324"
+          }
+        }
+      ]
+    ]
+  }
+}
