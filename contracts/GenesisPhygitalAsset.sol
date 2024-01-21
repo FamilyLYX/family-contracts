@@ -67,7 +67,7 @@ contract GenesisPhygitalAsset is LSP8Enumerable, IAssetVariants {
         string memory name_,
         string memory symbol_,
         address newOwner_
-    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 2, 0) {}
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, _LSP4_TOKEN_TYPE_NFT, _LSP8_TOKENID_FORMAT_UNIQUE_ID) {}
 
     // receive() external payable {
     //     emit Received(msg.sender, msg.value);
