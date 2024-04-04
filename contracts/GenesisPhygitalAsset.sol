@@ -45,13 +45,15 @@ contract GenesisPhygitalAsset is LSP8Enumerable, IAssetVariants {
     EnumerableSet.Bytes32Set internal _variants;
     EnumerableSet.AddressSet internal whitelistedMarketplaces;
 
+    address minter;
+
+    bytes public defaultTokenUri;
+    event DefaultTokenDataChanged(bytes newTokenUri);
+
     event Received(address, uint);
     event VariantRegistered(bytes12 variantId);
     event VariantUnregistered(bytes12 variantId);
-    event AssetMinted(
-        bytes12 indexed variantId,
-        bytes32 indexed tokenId
-    );
+    event AssetMinted(bytes12 indexed variantId, bytes32 indexed tokenId);
 
     error OnlyMinterCanMint();
 
@@ -66,8 +68,19 @@ contract GenesisPhygitalAsset is LSP8Enumerable, IAssetVariants {
     constructor(
         string memory name_,
         string memory symbol_,
-        address newOwner_
-    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, _LSP4_TOKEN_TYPE_NFT, _LSP8_TOKENID_FORMAT_UNIQUE_ID) {}
+        address newOwner_,
+        address minter_
+    )
+        LSP8IdentifiableDigitalAsset(
+            name_,
+            symbol_,
+            newOwner_,
+            _LSP4_TOKEN_TYPE_NFT,
+            _LSP8_TOKENID_FORMAT_MIXED_DEFAULT_NUMBER
+        )
+    {
+        minter = minter_;
+    }
 
     // receive() external payable {
     //     emit Received(msg.sender, msg.value);
@@ -87,10 +100,17 @@ contract GenesisPhygitalAsset is LSP8Enumerable, IAssetVariants {
         uint256 amount,
         bool allowNonLSP1Recipient,
         bytes memory data
-    ) public onlyOwner {
+    ) public {
+        require(
+            msg.sender == owner() || msg.sender == minter,
+            "Sender not minter"
+        );
         for (uint256 i; i < amount; ) {
             bytes32 tokenId = bytes32(uint256(_existingTokens + 1));
-            bytes32 variantDataKey = TokenUtils.getDataKey(address(this), variantId);
+            bytes32 variantDataKey = TokenUtils.getDataKey(
+                address(this),
+                variantId
+            );
 
             if (!_variants.contains(variantDataKey)) {
                 revert VariantNotRegistered();
@@ -111,6 +131,11 @@ contract GenesisPhygitalAsset is LSP8Enumerable, IAssetVariants {
                 ++i;
             }
         }
+    }
+
+    function setDefaultTokenUri(bytes calldata newTokenUri) external onlyOwner {
+        defaultTokenUri = newTokenUri;
+        emit DefaultTokenDataChanged(newTokenUri);
     }
 
     function whitelistMarketplace(address _marketplace) public onlyOwner {
