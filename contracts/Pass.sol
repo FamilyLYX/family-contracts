@@ -12,15 +12,13 @@ contract Pass is LSP8Enumerable {
 
     using EnumerableSet for EnumerableSet.AddressSet;
 
-
-
     // receive() external payable {
     //     emit Received(msg.sender, msg.value);
     // }
-    EnumerableSet.AddressSet minters; 
-
+    EnumerableSet.AddressSet minters;
 
     address public familyReceiver;
+    address public orderExtension;
 
     bytes public defaultTokenUri;
     event DefaultTokenDataChanged(bytes newTokenUri);
@@ -36,7 +34,8 @@ contract Pass is LSP8Enumerable {
         string memory name_,
         string memory symbol_,
         address newOwner_,
-        address receiver
+        address receiver,
+        address extension
     )
         LSP8IdentifiableDigitalAsset(
             name_,
@@ -47,6 +46,7 @@ contract Pass is LSP8Enumerable {
         )
     {
         familyReceiver = receiver;
+        orderExtension = extension;
     }
 
     function setDefaultTokenUri(bytes calldata newTokenUri) external onlyOwner {
@@ -70,11 +70,11 @@ contract Pass is LSP8Enumerable {
         return result;
     }
 
-    function getTotalMint() public view returns (uint256 number){
-        number=minters.length();
+    function getTotalMint() public view returns (uint256 number) {
+        number = minters.length();
     }
-    function hasMinted(address user) public view returns (bool minted){
-        minted=minters.contains(user);
+    function hasMinted(address user) public view returns (bool minted) {
+        minted = minters.contains(user);
     }
 
     // function mint() external payable {
@@ -88,42 +88,65 @@ contract Pass is LSP8Enumerable {
     //         minters.add(msg.sender);
     // }
 
-    function mintFiat(address to)external onlyOwner(){
+    function mintFiat(address to) external onlyOwner {
         require(!minters.contains(to), "User minted pass Already");
-            uint256 nextId = _existingTokens + 1;
-            _mint(to, bytes32(nextId), true, "0x");
-            minters.add(to);
-    }
-
-    function getMintHash(address minter, uint256 maxBlock, uint256 price) public pure returns (bytes memory message) {
-        message = bytes.concat(abi.encodePacked(minter), abi.encodePacked(maxBlock), abi.encodePacked(price));
-    }
-
-
-    function mintLYX(bytes memory signature, uint256 maxBlock, uint256 price)external payable{
-        require(!minters.contains(msg.sender), "User minted pass Already");
-        require(block.number<=maxBlock, "Block limit exceeded");
-        require(msg.value==price, "Invalid price");
         uint256 nextId = _existingTokens + 1;
-        (bool success, )=payable(familyReceiver).call{value:price}("");
-        require(success, 'TransferHelper::safeTransferLYX: LYX transfer failed');
-        bytes memory message = bytes.concat(abi.encodePacked(msg.sender),abi.encodePacked(maxBlock), abi.encodePacked(price));
-        
+        _mint(to, bytes32(nextId), true, "0x");
+        minters.add(to);
+    }
+
+    function getMintHash(
+        address minter,
+        uint256 maxBlock,
+        uint256 price
+    ) public pure returns (bytes memory message) {
+        message = bytes.concat(
+            abi.encodePacked(minter),
+            abi.encodePacked(maxBlock),
+            abi.encodePacked(price)
+        );
+    }
+
+    function mintLYX(
+        bytes memory signature,
+        uint256 maxBlock,
+        uint256 price
+    ) external payable {
+        require(!minters.contains(msg.sender), "User minted pass Already");
+        require(block.number <= maxBlock, "Block limit exceeded");
+        require(msg.value == price, "Invalid price");
+        uint256 nextId = _existingTokens + 1;
+        (bool success, ) = payable(familyReceiver).call{value: price}("");
+        require(
+            success,
+            "TransferHelper::safeTransferLYX: LYX transfer failed"
+        );
+        bytes memory message = bytes.concat(
+            abi.encodePacked(msg.sender),
+            abi.encodePacked(maxBlock),
+            abi.encodePacked(price)
+        );
+
         bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
 
         if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
             revert InvalidFamilySignature();
         }
-            
+
         _mint(msg.sender, bytes32(nextId), true, "0x");
         minters.add(msg.sender);
+    }
+
+    function burn(bytes32 tokenId, bytes memory data) external {
+        require(msg.sender == orderExtension, "Access Denied");
+        _burn(tokenId, data);
     }
 
     function _isValidSignature(
         bytes32 dataHash,
         bytes memory signature
     ) internal view returns (bytes4 magicValue) {
-        address target= owner();
+        address target = owner();
         // If owner is a contract
         if (target.code.length > 0) {
             (bool success, bytes memory result) = target.staticcall(
