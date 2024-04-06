@@ -57,6 +57,63 @@ contract OrderExtension is LSP17Extension, Ownable {
         );
     }
 
+    function redeemPerk(
+        address collection,
+        address perk,
+        bytes32 tokenId,
+        uint256 value,
+        uint256 maxBlockNumber,
+        bytes32 nonce,
+        bytes memory data,
+        bytes memory signature,
+        string memory orderId
+    ) public {
+        bytes memory message = bytes.concat(
+            bytes20(collection),
+            abi.encodePacked(value),
+            abi.encodePacked(maxBlockNumber),
+            nonce,
+            data
+        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
+
+        if (msg.sender != target) {
+            revert CallerNotTarget();
+        }
+
+        if (block.number > maxBlockNumber) {
+            revert BlockAlreadyConfirmed();
+        }
+
+        if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
+            revert InvalidSignature();
+        }
+
+        if (_extendableMsgValue() != value) {
+            revert IncorrectValue();
+        }
+
+        if (_nonces[nonce] != false) {
+            revert InvalidNonce();
+        }
+        bytes32[] memory tokenIds = ILSP8IdentifiableDigitalAsset(perk)
+            .tokenIdsOf(_extendableMsgSender());
+
+        require(itemExists(tokenIds, tokenId), "Does not have perk");
+
+        require(
+            !perkClaims[collection].contains(tokenId),
+            "Token Id already claimed"
+        );
+
+        perkClaims[collection].add(tokenId);
+
+        IERC725X(target).execute(0, collection, 0, data);
+
+        _nonces[nonce] = true;
+        emit OrderCreated(orderId);
+    }
+
     function redeemPass(
         address collection,
         address pass,
@@ -65,8 +122,7 @@ contract OrderExtension is LSP17Extension, Ownable {
         bytes32 nonce,
         bytes memory data,
         bytes memory signature,
-        string memory orderId,
-        RedeemType redeem
+        string memory orderId
     ) public {
         bytes memory message = bytes.concat(
             bytes20(collection),
@@ -97,38 +153,17 @@ contract OrderExtension is LSP17Extension, Ownable {
             revert InvalidNonce();
         }
 
-        if (redeem == RedeemType.PASS) {
-            require(
-                ILSP8IdentifiableDigitalAsset(pass).balanceOf(
-                    _extendableMsgSender()
-                ) == 1,
-                "Does not have pass"
-            );
-
-            bytes32 tokenId = ILSP8IdentifiableDigitalAsset(pass).tokenIdsOf(
+        require(
+            ILSP8IdentifiableDigitalAsset(pass).balanceOf(
                 _extendableMsgSender()
-            )[0];
-            LSP8Burnable(payable(pass)).burn(tokenId, "0x");
-        }
+            ) == 1,
+            "Does not have pass"
+        );
 
-        if (redeem == RedeemType.PERK) {
-            require(
-                ILSP8IdentifiableDigitalAsset(pass).balanceOf(
-                    _extendableMsgSender()
-                ) == 1,
-                "Does not have pass"
-            );
-
-            bytes32 tokenId = ILSP8IdentifiableDigitalAsset(pass).tokenIdsOf(
-                _extendableMsgSender()
-            )[0];
-            require(
-                !perkClaims[collection].contains(tokenId),
-                "Token Id already claimed"
-            );
-
-            perkClaims[collection].add(tokenId);
-        }
+        bytes32 tokenId = ILSP8IdentifiableDigitalAsset(pass).tokenIdsOf(
+            _extendableMsgSender()
+        )[0];
+        LSP8Burnable(payable(pass)).burn(tokenId, "0x");
 
         IERC725X(target).execute(0, collection, 0, data);
 
@@ -184,6 +219,18 @@ contract OrderExtension is LSP17Extension, Ownable {
         target = _newTarget;
 
         emit TargetChanged(_newTarget);
+    }
+
+    function itemExists(
+        bytes32[] memory list,
+        bytes32 _item
+    ) internal pure returns (bool) {
+        for (uint i = 0; i < list.length; i++) {
+            if (list[i] == _item) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function _isValidSignature(
