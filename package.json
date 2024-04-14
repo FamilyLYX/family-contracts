@@ -16,7 +16,7 @@
   "dependencies": {
     "@erc725/erc725.js": "^0.18.0",
     "@erc725/smart-contracts": "^5.2.0",
-    "@lukso/lsp-smart-contracts": "^0.14.0",
+    "@lukso/lsp-smart-contracts": "^0.15.0",
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
     "@nomicfoundation/hardhat-verify": "^1.0.0",

@@ -75,12 +75,9 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, LSP8Enumerable, IAssetVa
         address placeholderCollection
     )
         LSP8CappedSupply(maxLimit)
-        LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3)
+        LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, _LSP4_TOKEN_TYPE_NFT, _LSP8_TOKENID_FORMAT_UNIQUE_ID)
     {
         placeholder = placeholderCollection;
-        // Set the token id type to be bytes32
-        uint tokenIdType = 4;
-        _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
     }
     /**
      * Mint a token for an asset of a specific variant
@@ -122,6 +119,9 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, LSP8Enumerable, IAssetVa
         if (_exists(tokenId)) {
             revert AssetAlreadyRegistered();
         }
+
+        bytes memory tokenMetaData = _getData(variantDataKey);
+        setDataForTokenId(tokenId, _LSP4_METADATA_KEY, tokenMetaData);
 
         _mint(to, tokenId, allowNonLSP1Recipient, data);
 
