@@ -4,7 +4,7 @@ import { AbiCoder, concat, formatEther, keccak256, parseEther } from "ethers";
 import { ethers } from "hardhat";
 import { describe, it } from "mocha";
 
-describe("Minting to  user", async function () {
+describe("Pass: Minting to  user", async function () {
   it("Should set the right properties", async function () {
     const [userAccount, secondAccount] = await ethers.getSigners();
     const options: any = {
@@ -26,6 +26,7 @@ describe("Minting to  user", async function () {
     const Token = await genesisPerk.deploy(
       "Genesis Perk LSP7",
       "GEN",
+      ethers.getAddress(userAccount.address as string),
       ethers.getAddress(userAccount.address as string),
       ethers.getAddress(userAccount.address as string)
     );
@@ -57,7 +58,6 @@ describe("Minting to  user", async function () {
     );
 
     const mintReciept = await mintTxn.wait();
-    console.log("minted", mintReciept);
     expect(mintReciept?.status == 1);
   });
 });

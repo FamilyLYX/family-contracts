@@ -23,7 +23,7 @@ describe("GenesisPhygitalAsset", function () {
       const [owner, registry, userAccount] = await ethers.getSigners();
 
       const GenesisPhygitalAsset = await ethers.getContractFactory("GenesisPhygitalAsset", options);
-      const assetContract = await GenesisPhygitalAsset.deploy('IdentifiablePhygitalAsset', 'IPA', owner);
+      const assetContract = await GenesisPhygitalAsset.deploy('IdentifiablePhygitalAsset', 'IPA', owner, owner);
       const assetAddress = await assetContract.getAddress();
       
       const variantId = hexZeroPad(hexValue(29), 12),

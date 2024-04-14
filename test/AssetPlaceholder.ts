@@ -104,7 +104,7 @@ describe("AssetPlaceholder", function () {
         .to.be.revertedWithCustomError({ interface: AssetPlaceholder.interface }, 'MintingPeriodEnded');
     });
 
-    it.skip('should allow to mint tokens after end time extension', async () => {
+    it('should allow to mint tokens after end time extension', async () => {
       const assetUid = short.generate();
       const assetIdentifier = ethers.keccak256(toUtf8Bytes(assetUid));
       const [owner, userAccount] = await ethers.getSigners();
@@ -158,7 +158,7 @@ describe("AssetPlaceholder", function () {
       await tokenRegisterTxn.wait();
     });
 
-    it.skip('[digital] should allow to mint tokens after end time extension', async () => {
+    it('[digital] should allow to mint tokens after end time extension', async () => {
       const assetUid = short.generate();
       const assetIdentifier = ethers.keccak256(toUtf8Bytes(assetUid));
       const [owner, userAccount] = await ethers.getSigners();

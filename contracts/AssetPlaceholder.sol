@@ -108,6 +108,16 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         collections[collectionId] = collection;
     }
 
+    function updateMintDuration (address collection, uint48 duration) public onlyOwner {
+      bytes6 collectionId = TokenUtils.collectionId(collection);
+
+      if (collections[collectionId] == address(0)) {
+        revert CollectionNotRegistered();
+      }
+
+      collectionMeta[collection].endAt = collectionMeta[collection].startAt + duration;
+    }
+
     function register(
         string memory uid,
         bytes memory signature,

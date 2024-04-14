@@ -97,7 +97,7 @@ contract UncappedFamilyAsset is LSP8Enumerable, IAssetVariants {
         }
 
         bytes memory tokenMetaData = _getData(variantDataKey);
-        setDataForTokenId(tokenId, _LSP4_METADATA_KEY, tokenMetaData);
+        _setDataForTokenId(tokenId, _LSP4_METADATA_KEY, tokenMetaData);
 
         _mint(to, tokenId, allowNonLSP1Recipient, data);
 
