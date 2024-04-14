@@ -78,7 +78,8 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
             name_,
             symbol_,
             newOwner_,
-            placeholderTokenIdType
+            _LSP4_TOKEN_TYPE_NFT,
+            _LSP8_TOKENID_FORMAT_UNIQUE_ID
         )
     {
         assetRegistry = assetRegistry_;
@@ -91,10 +92,6 @@ contract AssetPlaceholder is LSP8IdentifiableDigitalAsset {
         bool digital
     ) public onlyOwner {
         bytes6 collectionId = TokenUtils.collectionId(collection);
-
-        if (collections[collectionId] == address(0)) {
-            revert CollectionNotRegistered();
-        }
 
         if (collections[collectionId] != address(0)) {
             revert CollectionAlreadyRegistered();
