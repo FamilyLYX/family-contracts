@@ -10,66 +10,230 @@ import {IERC725X} from "@erc725/smart-contracts/contracts/ERC725XCore.sol";
 
 import {LSP17Extension} from "@lukso/lsp-smart-contracts/contracts/LSP17ContractExtension/LSP17Extension.sol";
 import {ILSP0ERC725Account} from "@lukso/lsp-smart-contracts/contracts/LSP0ERC725Account/ILSP0ERC725Account.sol";
+import {ILSP8IdentifiableDigitalAsset} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/ILSP8IdentifiableDigitalAsset.sol";
+import {LSP8Burnable} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract OrderExtension is LSP17Extension, Ownable {
-  address target;
-  error BlockAlreadyConfirmed();
-  error InvalidSignature();
-  error IncorrectValue();
-  error InvalidNonce();
-  error CallerNotTarget();
+    using EnumerableSet for EnumerableSet.Bytes32Set;
 
-  mapping(bytes32 => bool) _nonces;
+    address target;
+    error BlockAlreadyConfirmed();
+    error InvalidSignature();
+    error IncorrectValue();
+    error InvalidNonce();
+    error CallerNotTarget();
 
-  event TargetChanged(address newTarget);
+    mapping(bytes32 => bool) _nonces;
 
-  constructor(
-    address target_
-  ) {
-    target = target_;
-  }
+    mapping(address => EnumerableSet.Bytes32Set) perkClaims;
 
-  function getOrderHash (address collection, uint256 value, uint256 maxBlockNumber, bytes32 nonce, bytes memory data) public pure returns (bytes memory message) {
-    message = bytes.concat(bytes20(collection), abi.encodePacked(value), abi.encodePacked(maxBlockNumber), nonce, data);
-  }
+    event TargetChanged(address newTarget);
+    event OrderCreated(string orderId);
 
-  function placeOrder(address collection, uint256 value, uint256 maxBlockNumber, bytes32 nonce, bytes memory data, bytes memory signature) public {
-    bytes memory message = bytes.concat(bytes20(collection), abi.encodePacked(value), abi.encodePacked(maxBlockNumber), nonce, data);
-    bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
-
-    if (msg.sender != target) {
-      revert CallerNotTarget();
+    enum RedeemType {
+        PERK,
+        PASS
     }
 
-    if (block.number > maxBlockNumber) {
-      revert BlockAlreadyConfirmed();
+    constructor(address target_) {
+        target = target_;
     }
 
-    if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
-      revert InvalidSignature();
+    function getOrderHash(
+        address collection,
+        uint256 value,
+        uint256 maxBlockNumber,
+        bytes32 nonce,
+        bytes memory data
+    ) public pure returns (bytes memory message) {
+        message = bytes.concat(
+            bytes20(collection),
+            abi.encodePacked(value),
+            abi.encodePacked(maxBlockNumber),
+            nonce,
+            data
+        );
     }
 
-    if (_extendableMsgValue() != value) {
-      revert IncorrectValue();
+    function redeemPerk(
+        address collection,
+        address perk,
+        bytes32 tokenId,
+        uint256 value,
+        uint256 maxBlockNumber,
+        bytes32 nonce,
+        bytes memory data,
+        bytes memory signature,
+        string memory orderId
+    ) public {
+        bytes memory message = bytes.concat(
+            bytes20(collection),
+            abi.encodePacked(value),
+            abi.encodePacked(maxBlockNumber),
+            nonce,
+            data
+        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
+
+        if (msg.sender != target) {
+            revert CallerNotTarget();
+        }
+
+        if (block.number > maxBlockNumber) {
+            revert BlockAlreadyConfirmed();
+        }
+
+        if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
+            revert InvalidSignature();
+        }
+
+        if (_extendableMsgValue() != value) {
+            revert IncorrectValue();
+        }
+
+        if (_nonces[nonce] != false) {
+            revert InvalidNonce();
+        }
+        bytes32[] memory tokenIds = ILSP8IdentifiableDigitalAsset(perk)
+            .tokenIdsOf(_extendableMsgSender());
+
+        require(itemExists(tokenIds, tokenId), "Does not have perk");
+
+        require(
+            !perkClaims[collection].contains(tokenId),
+            "Token Id already claimed"
+        );
+
+        perkClaims[collection].add(tokenId);
+
+        IERC725X(target).execute(0, collection, 0, data);
+
+        _nonces[nonce] = true;
+        emit OrderCreated(orderId);
     }
 
-    if (_nonces[nonce] != false) {
-      revert InvalidNonce();
+    function redeemPass(
+        address collection,
+        address pass,
+        uint256 value,
+        uint256 maxBlockNumber,
+        bytes32 nonce,
+        bytes memory data,
+        bytes memory signature,
+        string memory orderId
+    ) public {
+        bytes memory message = bytes.concat(
+            bytes20(collection),
+            abi.encodePacked(value),
+            abi.encodePacked(maxBlockNumber),
+            nonce,
+            data
+        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
+
+        if (msg.sender != target) {
+            revert CallerNotTarget();
+        }
+
+        if (block.number > maxBlockNumber) {
+            revert BlockAlreadyConfirmed();
+        }
+
+        if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
+            revert InvalidSignature();
+        }
+
+        if (_extendableMsgValue() != value) {
+            revert IncorrectValue();
+        }
+
+        if (_nonces[nonce] != false) {
+            revert InvalidNonce();
+        }
+
+        require(
+            ILSP8IdentifiableDigitalAsset(pass).balanceOf(
+                _extendableMsgSender()
+            ) == 1,
+            "Does not have pass"
+        );
+
+        bytes32 tokenId = ILSP8IdentifiableDigitalAsset(pass).tokenIdsOf(
+            _extendableMsgSender()
+        )[0];
+        LSP8Burnable(payable(pass)).burn(tokenId, "0x");
+
+        IERC725X(target).execute(0, collection, 0, data);
+
+        _nonces[nonce] = true;
+        emit OrderCreated(orderId);
     }
 
-    IERC725X(target).execute(0, collection, 0, data);
-    
-    _nonces[nonce] = true;
-  }
+    function placeOrder(
+        address collection,
+        uint256 value,
+        uint256 maxBlockNumber,
+        bytes32 nonce,
+        bytes memory data,
+        bytes memory signature,
+        string memory orderId
+    ) public {
+        bytes memory message = bytes.concat(
+            bytes20(collection),
+            abi.encodePacked(value),
+            abi.encodePacked(maxBlockNumber),
+            nonce,
+            data
+        );
+        bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
 
-  function updateTarget(address _newTarget) public onlyOwner {
-    target = _newTarget;
+        if (msg.sender != target) {
+            revert CallerNotTarget();
+        }
 
-    emit TargetChanged(_newTarget);
-  }
+        if (block.number > maxBlockNumber) {
+            revert BlockAlreadyConfirmed();
+        }
 
-  function _isValidSignature(
+        if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
+            revert InvalidSignature();
+        }
+
+        if (_extendableMsgValue() != value) {
+            revert IncorrectValue();
+        }
+
+        if (_nonces[nonce] != false) {
+            revert InvalidNonce();
+        }
+
+        IERC725X(target).execute(0, collection, 0, data);
+
+        _nonces[nonce] = true;
+        emit OrderCreated(orderId);
+    }
+
+    function updateTarget(address _newTarget) public onlyOwner {
+        target = _newTarget;
+
+        emit TargetChanged(_newTarget);
+    }
+
+    function itemExists(
+        bytes32[] memory list,
+        bytes32 _item
+    ) internal pure returns (bool) {
+        for (uint i = 0; i < list.length; i++) {
+            if (list[i] == _item) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    function _isValidSignature(
         bytes32 dataHash,
         bytes memory signature
     ) internal view returns (bytes4 magicValue) {
