@@ -29,8 +29,6 @@ interface IAssetVariants {
     ) external;
 }
 
-uint16 constant tokenIdType = 3;
-
 contract UncappedFamilyAsset is LSP8Enumerable, IAssetVariants {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
@@ -57,7 +55,7 @@ contract UncappedFamilyAsset is LSP8Enumerable, IAssetVariants {
         string memory symbol_,
         address newOwner_,
         address placeholderCollection
-    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, tokenIdType) {
+    ) LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, _LSP4_TOKEN_TYPE_NFT, _LSP8_TOKENID_FORMAT_UNIQUE_ID) {
         placeholder = placeholderCollection;
     }
 
@@ -97,6 +95,9 @@ contract UncappedFamilyAsset is LSP8Enumerable, IAssetVariants {
         if (_exists(tokenId)) {
             revert AssetAlreadyRegistered();
         }
+
+        bytes memory tokenMetaData = _getData(variantDataKey);
+        setDataForTokenId(tokenId, _LSP4_METADATA_KEY, tokenMetaData);
 
         _mint(to, tokenId, allowNonLSP1Recipient, data);
 
