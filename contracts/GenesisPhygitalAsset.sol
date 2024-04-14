@@ -9,10 +9,8 @@ import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {LSP8IdentifiableDigitalAsset} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8IdentifiableDigitalAsset.sol";
-import {LSP8CappedSupply} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8CappedSupply.sol";
 import {LSP8Enumerable} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8Enumerable.sol";
-
-import {LSP8IdentifiableDigitalAssetCore} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8IdentifiableDigitalAsset.sol";
+import {LSP8CappedSupply} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8CappedSupply.sol";
 
 import {TokenUtils, TokenId} from "./TokenUtils.sol";
 
@@ -33,31 +31,31 @@ interface IAssetVariants {
 
     function mint(
         address to,
-        bytes12 assetId,
         bytes12 variantId,
+        uint256 amount,
         bool allowNonLSP1Recipient,
         bytes memory data
     ) external;
 }
 
-uint16 constant tokenIdType = 3;
-
-contract IdentifiablePhygitalAsset is LSP8CappedSupply, LSP8Enumerable, IAssetVariants {
+contract GenesisPhygitalAsset is LSP8Enumerable, IAssetVariants {
     using EnumerableSet for EnumerableSet.Bytes32Set;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
-    address public placeholder;
     EnumerableSet.Bytes32Set internal _variants;
+    EnumerableSet.AddressSet internal whitelistedMarketplaces;
+
+    address minter;
+
+    bytes public defaultTokenUri;
+    event DefaultTokenDataChanged(bytes newTokenUri);
 
     event Received(address, uint);
     event VariantRegistered(bytes12 variantId);
     event VariantUnregistered(bytes12 variantId);
-    event AssetMinted(
-        bytes12 indexed variantId,
-        bytes12 indexed assetId,
-        bytes32 indexed tokenId
-    );
+    event AssetMinted(bytes12 indexed variantId, bytes32 indexed tokenId);
 
-    error OnlyPlaceholderCanMint();
+    error OnlyMinterCanMint();
 
     error VariantAlreadyRegistered();
     error VariantNotRegistered();
@@ -71,61 +69,101 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, LSP8Enumerable, IAssetVa
         string memory name_,
         string memory symbol_,
         address newOwner_,
-        uint256 maxLimit,
-        address placeholderCollection
+        address minter_
     )
-        LSP8CappedSupply(maxLimit)
-        LSP8IdentifiableDigitalAsset(name_, symbol_, newOwner_, 3, 3)
+        LSP8IdentifiableDigitalAsset(
+            name_,
+            symbol_,
+            newOwner_,
+            _LSP4_TOKEN_TYPE_NFT,
+            _LSP8_TOKENID_FORMAT_MIXED_DEFAULT_NUMBER
+        )
     {
-        placeholder = placeholderCollection;
-        // Set the token id type to be bytes32
-        uint tokenIdType = 4;
-        _setData(_DATAKEY_TOKENID_TYPE, abi.encodePacked(tokenIdType));
+        minter = minter_;
     }
+
+    // receive() external payable {
+    //     emit Received(msg.sender, msg.value);
+    // }
+
     /**
      * Mint a token for an asset of a specific variant
      *
      * @param to Address of the UP to mint token to
-     * @param assetId A bytes12 long identifier for an asset
      * @param variantId A bytes12 long identifier for a variant
      * @param allowNonLSP1Recipient A bool to check if only minting should only be allowed to UPs
      * @param data arbitary data
      */
     function mint(
         address to,
-        bytes12 assetId,
         bytes12 variantId,
+        uint256 amount,
         bool allowNonLSP1Recipient,
         bytes memory data
     ) public {
-        if (msg.sender != placeholder) {
-            revert OnlyPlaceholderCanMint();
-        }
-
-        if (assetId == bytes12(0)) {
-            revert AssetIdCannotBeZero();
-        }
-
-        TokenId memory tokenIdObj = TokenId(
-            TokenUtils.collectionId(address(this)),
-            variantId,
-            assetId
+        require(
+            msg.sender == owner() || msg.sender == minter,
+            "Sender not minter"
         );
-        bytes32 variantDataKey = TokenUtils.getDataKey(tokenIdObj);
+        for (uint256 i; i < amount; ) {
+            bytes32 tokenId = bytes32(uint256(_existingTokens + 1));
+            bytes32 variantDataKey = TokenUtils.getDataKey(
+                address(this),
+                variantId
+            );
 
-        if (!_variants.contains(variantDataKey)) {
-            revert VariantNotRegistered();
+            if (!_variants.contains(variantDataKey)) {
+                revert VariantNotRegistered();
+            }
+
+            if (_exists(tokenId)) {
+                revert AssetAlreadyRegistered();
+            }
+
+            bytes memory metadata = _getData(variantDataKey);
+            _mint(to, tokenId, allowNonLSP1Recipient, data);
+            _setDataForTokenId(tokenId, _LSP4_METADATA_KEY, metadata);
+
+            emit AssetMinted(variantId, tokenId);
+
+            // Increment the iterator in unchecked block to save gas
+            unchecked {
+                ++i;
+            }
         }
+    }
 
-        bytes32 tokenId = TokenUtils.getTokenId(tokenIdObj);
+    function setDefaultTokenUri(bytes calldata newTokenUri) external onlyOwner {
+        defaultTokenUri = newTokenUri;
+        emit DefaultTokenDataChanged(newTokenUri);
+    }
 
-        if (_exists(tokenId)) {
-            revert AssetAlreadyRegistered();
-        }
+    function whitelistMarketplace(address _marketplace) public onlyOwner {
+        require(
+            !whitelistedMarketplaces.contains(_marketplace),
+            "Already Whitelisted"
+        );
+        whitelistedMarketplaces.add(_marketplace);
+    }
 
-        _mint(to, tokenId, allowNonLSP1Recipient, data);
+    function removeMarketplace(address _marketplace) public onlyOwner {
+        require(
+            whitelistedMarketplaces.contains(_marketplace),
+            "Marketplace not whitelisted"
+        );
+        whitelistedMarketplaces.remove(_marketplace);
+    }
 
-        emit AssetMinted(variantId, assetId, tokenId);
+    function authorizeOperator(
+        address operator,
+        bytes32 tokenId,
+        bytes memory operatorNotificationData
+    ) public override {
+        require(
+            whitelistedMarketplaces.contains(operator),
+            "Operator not whitelisted"
+        );
+        super.authorizeOperator(operator, tokenId, operatorNotificationData);
     }
 
     function registerVariant(
@@ -189,23 +227,5 @@ contract IdentifiablePhygitalAsset is LSP8CappedSupply, LSP8Enumerable, IAssetVa
             _interfaceId == type(IAssetVariants).interfaceId ||
             _interfaceId == _INTERFACEID_CAPPED_LSP8 ||
             super.supportsInterface(_interfaceId);
-    }
-
-    function _beforeTokenTransfer(
-        address from,
-        address to,
-        bytes32 tokenId,
-        bytes memory data
-    ) internal virtual override(LSP8Enumerable, LSP8IdentifiableDigitalAssetCore) {
-        LSP8Enumerable._beforeTokenTransfer(from, to, tokenId, data);
-    }
-
-    function _mint(
-        address to,
-        bytes32 tokenId,
-        bool force,
-        bytes memory data
-    ) internal virtual override(LSP8CappedSupply, LSP8IdentifiableDigitalAssetCore) {
-        LSP8CappedSupply._mint(to, tokenId, force, data);
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "@lukso/lsp-smart-contracts/contracts/LSP4DigitalAssetMetadata/LSP4Constants.sol";
+import "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/LSP8Constants.sol";
 import "@lukso/lsp-smart-contracts/contracts/LSP17ContractExtension/LSP17Constants.sol";
 
 bytes4 constant _INTERFACEID_CAPPED_LSP8 = 0x52058d8a;
