@@ -8,7 +8,7 @@ import {LSP8CappedSupply} from "@lukso/lsp-smart-contracts/contracts/LSP8Identif
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "./constants.sol";
 
-contract Pass is LSP8CappedSupply {
+contract GiveawayPass is LSP8CappedSupply {
     event Received(address, uint);
 
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -94,7 +94,7 @@ contract Pass is LSP8CappedSupply {
     //         minters.add(msg.sender);
     // }
 
-    function mintFiat(address to) external onlyOwner {
+    function mint(address to) external onlyOwner {
         require(!minters.contains(to), "User minted pass Already");
         uint256 nextId = _existingTokens + 1;
         _mint(to, bytes32(nextId), true, "0x");
@@ -113,79 +113,8 @@ contract Pass is LSP8CappedSupply {
         );
     }
 
-    function mintLYX(
-        bytes memory signature,
-        uint256 maxBlock,
-        uint256 price
-    ) external payable {
-        require(!minters.contains(msg.sender), "User minted pass Already");
-        require(block.number <= maxBlock, "Block limit exceeded");
-        require(msg.value == price, "Invalid price");
-        uint256 nextId = _existingTokens + 1;
-        (bool success, ) = payable(familyReceiver).call{value: price}("");
-        require(
-            success,
-            "TransferHelper::safeTransferLYX: LYX transfer failed"
-        );
-        bytes memory message = bytes.concat(
-            abi.encodePacked(msg.sender),
-            abi.encodePacked(maxBlock),
-            abi.encodePacked(price)
-        );
-
-        bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
-
-        if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
-            revert InvalidFamilySignature();
-        }
-
-        _mint(msg.sender, bytes32(nextId), true, "0x");
-        minters.add(msg.sender);
-    }
-
     function burn(bytes32 tokenId, bytes memory data) external {
         require(msg.sender == orderExtension, "Access Denied");
         _burn(tokenId, data);
-    }
-
-    function _isValidSignature(
-        bytes32 dataHash,
-        bytes memory signature
-    ) internal view returns (bytes4 magicValue) {
-        address target = owner();
-        // If owner is a contract
-        if (target.code.length > 0) {
-            (bool success, bytes memory result) = target.staticcall(
-                abi.encodeWithSelector(
-                    IERC1271.isValidSignature.selector,
-                    dataHash,
-                    signature
-                )
-            );
-
-            bool isValid = (success &&
-                result.length == 32 &&
-                abi.decode(result, (bytes32)) == bytes32(_ERC1271_MAGICVALUE));
-
-            return isValid ? _ERC1271_MAGICVALUE : _ERC1271_FAILVALUE;
-        }
-        // If owner is an EOA
-        else {
-            // if isValidSignature fail, the error is catched in returnedError
-            (address recoveredAddress, ECDSA.RecoverError returnedError) = ECDSA
-                .tryRecover(dataHash, signature);
-
-            // if recovering throws an error, return the fail value
-            if (returnedError != ECDSA.RecoverError.NoError)
-                return _ERC1271_FAILVALUE;
-
-            // if recovering is successful and the recovered address matches the owner's address,
-            // return the ERC1271 magic value. Otherwise, return the ERC1271 fail value
-            // matches the address of the owner, otherwise return fail value
-            return
-                recoveredAddress == target
-                    ? _ERC1271_MAGICVALUE
-                    : _ERC1271_FAILVALUE;
-        }
     }
 }
