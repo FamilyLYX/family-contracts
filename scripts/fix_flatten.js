@@ -3,9 +3,13 @@ const fs = require('fs');
 
 let files = [
   './flat_contracts/AssetPlaceholder.sol',
-  './flat_contracts/AssetRegistry.sol',
+  './flat_contracts/OrderExtension.sol',
   './flat_contracts/IdentifiablePhygitalAsset.sol',
-  './flat_contracts/OrderExtension.sol'
+  './flat_contracts/AssetRegistry.sol',
+  './flat_contracts/UncappedFamilyAsset.sol',
+  './flat_contracts/GenesisPhygitalAsset.sol',
+  './flat_contracts/GenesisPerk.sol',
+  './flat_contracts/Pass.sol'
 ];
 
 files.map((file) => {

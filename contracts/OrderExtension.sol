@@ -11,31 +11,32 @@ import {IERC725X} from "@erc725/smart-contracts/contracts/ERC725XCore.sol";
 import {LSP17Extension} from "@lukso/lsp-smart-contracts/contracts/LSP17ContractExtension/LSP17Extension.sol";
 import {ILSP0ERC725Account} from "@lukso/lsp-smart-contracts/contracts/LSP0ERC725Account/ILSP0ERC725Account.sol";
 import {ILSP8IdentifiableDigitalAsset} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/ILSP8IdentifiableDigitalAsset.sol";
+import {LSP2Utils} from "@lukso/lsp2-contracts/contracts/LSP2Utils.sol";
 import {LSP8Burnable} from "@lukso/lsp-smart-contracts/contracts/LSP8IdentifiableDigitalAsset/extensions/LSP8Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+
+bytes2 constant _BURN_AFTER_USE = 0xffff;
 
 contract OrderExtension is LSP17Extension, Ownable {
     using EnumerableSet for EnumerableSet.Bytes32Set;
 
     address target;
+
     error BlockAlreadyConfirmed();
     error InvalidSignature();
     error IncorrectValue();
     error InvalidNonce();
     error CallerNotTarget();
+    error CallerNotPerkOwner();
+    error PerkAlreadyClaimed();
 
     mapping(bytes32 => bool) _nonces;
 
     mapping(address => EnumerableSet.Bytes32Set) perkClaims;
 
     event TargetChanged(address newTarget);
-    event OrderCreated(string orderId);
-
-    enum RedeemType {
-        PERK,
-        PASS
-    }
+    event OrderCreated(bytes orderId);
 
     constructor(address target_) {
         target = target_;
@@ -46,12 +47,36 @@ contract OrderExtension is LSP17Extension, Ownable {
         uint256 value,
         uint256 maxBlockNumber,
         bytes32 nonce,
-        bytes memory data
+        bytes memory data,
+        bytes memory orderId
     ) public pure returns (bytes memory message) {
         message = bytes.concat(
             bytes20(collection),
             abi.encodePacked(value),
             abi.encodePacked(maxBlockNumber),
+            nonce,
+            data,
+            orderId
+        );
+    }
+
+    function getRedeemPerkHash(
+        address collection,
+        uint256 value,
+        uint256 maxBlockNumber,
+        address perkAddress,
+        bytes32 perkTokenId,
+        bytes32 nonce,
+        bytes memory data,
+        bytes memory orderId
+    ) public pure returns (bytes memory message) {
+        message = bytes.concat(
+            bytes20(collection),
+            abi.encodePacked(value),
+            abi.encodePacked(maxBlockNumber),
+            bytes20(perkAddress),
+            perkTokenId,
+            orderId,
             nonce,
             data
         );
@@ -59,75 +84,22 @@ contract OrderExtension is LSP17Extension, Ownable {
 
     function redeemPerk(
         address collection,
-        address perk,
-        bytes32 tokenId,
+        address perkAddress,
+        bytes32 perkTokenId,
         uint256 value,
         uint256 maxBlockNumber,
         bytes32 nonce,
         bytes memory data,
         bytes memory signature,
-        string memory orderId
+        bytes memory orderId
     ) public {
         bytes memory message = bytes.concat(
             bytes20(collection),
             abi.encodePacked(value),
             abi.encodePacked(maxBlockNumber),
-            nonce,
-            data
-        );
-        bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
-
-        if (msg.sender != target) {
-            revert CallerNotTarget();
-        }
-
-        if (block.number > maxBlockNumber) {
-            revert BlockAlreadyConfirmed();
-        }
-
-        if (_isValidSignature(messageHash, signature) != _ERC1271_MAGICVALUE) {
-            revert InvalidSignature();
-        }
-
-        if (_extendableMsgValue() != value) {
-            revert IncorrectValue();
-        }
-
-        if (_nonces[nonce] != false) {
-            revert InvalidNonce();
-        }
-        bytes32[] memory tokenIds = ILSP8IdentifiableDigitalAsset(perk)
-            .tokenIdsOf(_extendableMsgSender());
-
-        require(itemExists(tokenIds, tokenId), "Does not have perk");
-
-        require(
-            !perkClaims[collection].contains(tokenId),
-            "Token Id already claimed"
-        );
-
-        perkClaims[collection].add(tokenId);
-
-        IERC725X(target).execute(0, collection, 0, data);
-
-        _nonces[nonce] = true;
-        emit OrderCreated(orderId);
-    }
-
-    function redeemPass(
-        address collection,
-        address pass,
-        uint256 value,
-        uint256 maxBlockNumber,
-        bytes32 nonce,
-        bytes memory data,
-        bytes memory signature,
-        string memory orderId
-    ) public {
-        bytes memory message = bytes.concat(
-            bytes20(collection),
-            abi.encodePacked(value),
-            abi.encodePacked(maxBlockNumber),
+            bytes20(perkAddress),
+            perkTokenId,
+            orderId,
             nonce,
             data
         );
@@ -153,22 +125,30 @@ contract OrderExtension is LSP17Extension, Ownable {
             revert InvalidNonce();
         }
 
-        require(
-            ILSP8IdentifiableDigitalAsset(pass).balanceOf(
-                _extendableMsgSender()
-            ) == 1,
-            "Does not have pass"
-        );
+        address perkOwner = ILSP8IdentifiableDigitalAsset(perkAddress)
+            .tokenOwnerOf(perkTokenId);
 
-        bytes32 tokenId = ILSP8IdentifiableDigitalAsset(pass).tokenIdsOf(
-            _extendableMsgSender()
-        )[0];
-        LSP8Burnable(payable(pass)).burn(tokenId, "0x");
+        if (perkOwner != _extendableMsgSender()){
+            revert CallerNotPerkOwner();
+        }
+
+        if (perkClaims[collection].contains(perkTokenId)) {
+            revert PerkAlreadyClaimed();
+        }
+
+        perkClaims[collection].add(perkTokenId);
 
         IERC725X(target).execute(0, collection, 0, data);
 
         _nonces[nonce] = true;
         emit OrderCreated(orderId);
+
+        bytes32 dataKey = LSP2Utils.generateSingletonKey('BurnAfterUse');
+        bytes memory burnAfterUse = ILSP8IdentifiableDigitalAsset(perkAddress).getData(dataKey);
+
+        if (bytes2(burnAfterUse) == _BURN_AFTER_USE) {
+            LSP8Burnable(payable(perkAddress)).burn(perkTokenId, orderId);
+        }
     }
 
     function placeOrder(
@@ -178,16 +158,19 @@ contract OrderExtension is LSP17Extension, Ownable {
         bytes32 nonce,
         bytes memory data,
         bytes memory signature,
-        string memory orderId
+        bytes memory orderId
     ) public {
         bytes memory message = bytes.concat(
             bytes20(collection),
             abi.encodePacked(value),
             abi.encodePacked(maxBlockNumber),
             nonce,
-            data
+            data,
+            orderId
         );
         bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
+
+        console.logBytes32(LSP2Utils.generateSingletonKey('BurnAfterUse'));
 
         if (msg.sender != target) {
             revert CallerNotTarget();

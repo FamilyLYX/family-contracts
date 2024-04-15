@@ -129,12 +129,23 @@ describe("OrderExtension", function () {
 
       await profile.contract.setData(`0x4b80742de2bf82acb3630000${extensionAddress.slice(2)}`, FULL_PERMISSIONS)
 
-      const extensionDataKey = hexConcat([
+      const extensionPlaceOrderDataKey = hexConcat([
         '0xcee78b4094da860110960000',
         extension.placeOrder.fragment.selector,
         hexZeroPad(hexValue(0), 16)
       ]);
-      await profile.contract.setData(extensionDataKey, extensionAddress);
+
+      const extensionRedeemPerkDataKey = hexConcat([
+        '0xcee78b4094da860110960000',
+        extension.redeemPerk.fragment.selector,
+        hexZeroPad(hexValue(0), 16)
+      ]);
+
+      console.log(extensionPlaceOrderDataKey);
+      console.log(extensionRedeemPerkDataKey);
+
+      await profile.contract.setData(extensionPlaceOrderDataKey, extensionAddress);
+      await profile.contract.setData(extensionRedeemPerkDataKey, extensionAddress);
 
       expect(await profile.contract.getData(`0x4b80742de2bf82acb3630000${extensionAddress.slice(2)}`))
         .to.equal(FULL_PERMISSIONS);
@@ -151,13 +162,14 @@ describe("OrderExtension", function () {
         value,
         blockNumber,
         hexZeroPad(hexValue(1), 32),
-        mintCalldata
+        mintCalldata,
+        hexZeroPad(hexValue(1), 32)
       ));
 
       const signature = await owner.signMessage(arrayify(orderHash));
       const extensionCalldata = extension.interface.encodeFunctionData(
         'placeOrder',
-        [placeholder.address, value, blockNumber, hexZeroPad(hexValue(1), 32), mintCalldata, signature, '123']
+        [placeholder.address, value, blockNumber, hexZeroPad(hexValue(1), 32), mintCalldata, signature, hexZeroPad(hexValue(1), 32)]
       );
 
       expect(owner.sendTransaction({
@@ -211,13 +223,14 @@ describe("OrderExtension", function () {
         value,
         blockNumber,
         hexZeroPad(hexValue(1), 32),
-        mintCalldata
+        mintCalldata,
+        hexZeroPad(hexValue(1), 32)
       ));
 
       const signature = await owner.signMessage(arrayify(orderHash));
       const extensionCalldata = extension.interface.encodeFunctionData(
         'placeOrder',
-        [placeholder.address, value, blockNumber, hexZeroPad(hexValue(1), 32), mintCalldata, signature, '123']
+        [placeholder.address, value, blockNumber, hexZeroPad(hexValue(1), 32), mintCalldata, signature, hexZeroPad(hexValue(1), 32)]
       );
 
       await owner.sendTransaction({
@@ -272,14 +285,15 @@ describe("OrderExtension", function () {
         value,
         blockNumber,
         hexZeroPad(hexValue(1), 32),
-        mintCalldata
+        mintCalldata,
+        hexZeroPad(hexValue(1), 32)
       ));
 
       const signature = await owner.signMessage(arrayify(orderHash));
 
       const extensionCalldata = extension.interface.encodeFunctionData(
         'placeOrder',
-        [placeholder.address, value, blockNumber, hexZeroPad(hexValue(1), 32), mintCalldata, signature, '123']
+        [placeholder.address, value, blockNumber, hexZeroPad(hexValue(1), 32), mintCalldata, signature, hexZeroPad(hexValue(1), 32)]
       );
 
       await userAccount.sendTransaction({
