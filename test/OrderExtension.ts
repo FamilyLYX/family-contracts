@@ -2,11 +2,11 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 import short from 'short-uuid';
 
-import { toUtf8Bytes } from "ethers";
+import { solidityPacked, toUtf8Bytes } from "ethers";
 import { arrayify, hexConcat, hexValue, hexZeroPad, hexlify } from "@ethersproject/bytes";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
-const FULL_PERMISSIONS = '0x00000000000000000000000000000000000000000000000000000000003fff7f';
+const FULL_PERMISSIONS = '0x00000000000000000000000000000000000000000000000000000000003fffff';
 
 async function setupAssets (signer: SignerWithAddress, owner: string) {
   const assetUid = short.generate();
@@ -140,9 +140,6 @@ describe("OrderExtension", function () {
         extension.redeemPerk.fragment.selector,
         hexZeroPad(hexValue(0), 16)
       ]);
-
-      console.log(extensionPlaceOrderDataKey);
-      console.log(extensionRedeemPerkDataKey);
 
       await profile.contract.setData(extensionPlaceOrderDataKey, extensionAddress);
       await profile.contract.setData(extensionRedeemPerkDataKey, extensionAddress);
@@ -311,6 +308,63 @@ describe("OrderExtension", function () {
       expect(await ethers.provider.getBalance(userProfile.address)).to.equal(ethers.parseEther('1'));
 
       expect(await ethers.provider.getBalance(profile.address)).to.equal(value);
+    });
+
+    it('should allow to place order for a UP', async () => {
+      const assetUid = short.generate();
+      const assetIdentifier = ethers.keccak256(toUtf8Bytes(assetUid));
+      const [owner, userAccount] = await ethers.getSigners();
+      const { profile, keyManager } = await setupProfile(owner);
+      const { placeholder, asset, meta } = await setupAssets(owner, profile.address);
+
+      const { profile: userProfile, keyManager: userKeyManager } = await setupProfile(userAccount);
+      
+      expect(await placeholder.contract.owner()).to.equal(profile.address);
+      expect(await asset.contract.owner()).to.equal(profile.address);
+      expect(await profile.contract.owner()).to.equal(keyManager.address);
+      expect(await keyManager.contract.getTarget()).to.equal(profile.address);
+
+      const OrderExtension = await ethers.getContractFactory("OrderExtension");
+      const extension = await OrderExtension.deploy(profile.address);
+      const extensionAddress = await extension.getAddress();
+
+      await profile.contract.setData(`0x4b80742de2bf82acb3630000${extensionAddress.slice(2)}`, FULL_PERMISSIONS)
+
+      expect(await profile.contract.getData(`0x4b80742de2bf82acb3630000${extensionAddress.slice(2)}`))
+        .to.equal(FULL_PERMISSIONS);
+
+      const mintCalldata = placeholder.contract.interface.encodeFunctionData(
+        'mint',
+        [userProfile.address, asset.address, meta.variantId, true, '0x', false]
+      );
+      const blockNumber = await ethers.provider.getBlockNumber() + 10000;
+      const value = ethers.parseEther('0');
+
+      const orderHash = ethers.keccak256(await extension.getOrderHash(
+        placeholder.address,
+        value,
+        blockNumber,
+        hexZeroPad(hexValue(1), 32),
+        mintCalldata,
+        hexZeroPad(hexValue(1), 32)
+      ));
+
+      const signature = await owner.signMessage(arrayify(orderHash));
+
+      const extensionCalldata = extension.interface.encodeFunctionData(
+        'placeOrder',
+        [placeholder.address, value, blockNumber, hexZeroPad(hexValue(1), 32), mintCalldata, signature, hexZeroPad(hexValue(1), 32)]
+      );
+      const userAddress = await userAccount.getAddress();
+      const zeroValue = hexZeroPad(hexValue(0), 32);
+
+      const calldata = solidityPacked(['bytes', 'address', 'bytes32'], [extensionCalldata, userAddress, zeroValue]);
+
+      const txnReciept = await profile.contract
+        .connect(owner)
+        .execute(0, extensionAddress, 0, calldata);
+
+      expect(await placeholder.contract.balanceOf(userProfile.address)).to.equal(1);
     });
   });
 });

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.9;
 
 import "./constants.sol";
-import "hardhat/console.sol";
+// import "hardhat/console.sol";
 
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
@@ -170,8 +170,6 @@ contract OrderExtension is LSP17Extension, Ownable {
         );
         bytes32 messageHash = ECDSA.toEthSignedMessageHash(keccak256(message));
 
-        console.logBytes32(LSP2Utils.generateSingletonKey('BurnAfterUse'));
-
         if (msg.sender != target) {
             revert CallerNotTarget();
         }
@@ -202,18 +200,6 @@ contract OrderExtension is LSP17Extension, Ownable {
         target = _newTarget;
 
         emit TargetChanged(_newTarget);
-    }
-
-    function itemExists(
-        bytes32[] memory list,
-        bytes32 _item
-    ) internal pure returns (bool) {
-        for (uint i = 0; i < list.length; i++) {
-            if (list[i] == _item) {
-                return true;
-            }
-        }
-        return false;
     }
 
     function _isValidSignature(

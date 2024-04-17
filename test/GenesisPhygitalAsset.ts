@@ -41,8 +41,8 @@ describe("GenesisPhygitalAsset", function () {
       const transferEvent = txnReciept?.logs.filter((log: any) => log.eventName === 'Transfer')[0] as EventLog;
       const tokenId = transferEvent?.args[3];
 
-      console.log(await assetContract.getData(ERC725.encodeKeyName('LSP4TokenType')))
-      console.log(await assetContract.getData(ERC725.encodeKeyName('LSP8TokenIdFormat')));
+      // console.log(await assetContract.getData(ERC725.encodeKeyName('LSP4TokenType')))
+      // console.log(await assetContract.getData(ERC725.encodeKeyName('LSP8TokenIdFormat')));
     });
   });
 });
